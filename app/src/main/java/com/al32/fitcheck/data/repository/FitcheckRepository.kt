@@ -42,6 +42,10 @@ class FitcheckRepository(
         workoutDao.updateExerciseOrder(workoutId, exerciseId, newOrder)
     }
 
+    suspend fun removeExerciseFromWorkout(workoutId: Long, exerciseId: Long) {
+        workoutDao.removeExerciseFromWorkout(workoutId, exerciseId)
+    }
+
     fun getExercisesForWorkout(workoutId: Long): Flow<List<ExerciseEntity>> = 
         workoutDao.getExercisesForWorkout(workoutId)
 
@@ -60,6 +64,19 @@ class FitcheckRepository(
 
     fun searchExercises(query: String): Flow<List<ExerciseEntity>> =
         exerciseDao.searchExercises(query)
+
+    suspend fun duplicateTemplate(templateId: Long) {
+        val original = workoutDao.getWorkoutById(templateId) ?: return
+        val newId = startWorkout(original.name + " (COPY)", isTemplate = true)
+        val entries = workoutDao.getWorkoutExerciseEntriesSync(templateId)
+        entries.forEach { entry ->
+            workoutDao.insertWorkoutExercise(entry.copy(id = 0, workoutId = newId))
+        }
+    }
+
+    suspend fun updateTemplateName(id: Long, name: String) {
+        workoutDao.updateWorkoutName(id, name)
+    }
 
     suspend fun deleteWorkout(workout: WorkoutEntity) {
         workoutDao.deleteWorkout(workout)
@@ -86,6 +103,8 @@ class FitcheckRepository(
     fun getSetsForWorkout(workoutId: Long): Flow<List<SetEntity>> = setDao.getSetsForWorkout(workoutId)
     
     fun getHistoryForExercise(exerciseId: Long): Flow<List<SetEntity>> = setDao.getHistoryForExercise(exerciseId)
+
+    fun getAllCompletedSets(): Flow<List<SetEntity>> = setDao.getAllCompletedSets()
 
     suspend fun addSet(set: SetEntity) = setDao.insertSet(set)
 

@@ -46,6 +46,12 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkouts(workouts: List<WorkoutEntity>)
 
+    @Query("SELECT * FROM workout_exercises WHERE workoutId = :workoutId")
+    suspend fun getWorkoutExerciseEntriesSync(workoutId: Long): List<WorkoutExerciseEntity>
+
+    @Query("UPDATE workouts SET name = :name WHERE id = :id")
+    suspend fun updateWorkoutName(id: Long, name: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkout(workout: WorkoutEntity): Long
 

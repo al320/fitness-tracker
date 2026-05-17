@@ -1,15 +1,12 @@
 package com.al32.fitcheck.ui.features.profile
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,30 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.al32.fitcheck.data.local.entities.UserStatsEntity
-import com.al32.fitcheck.ui.components.XPBar
 import com.al32.fitcheck.ui.theme.FitcheckTheme
-import com.al32.fitcheck.ui.theme.PrestigeGold
+import com.al32.fitcheck.ui.theme.EliteWhite
 import com.al32.fitcheck.ui.viewmodel.ProfileViewModel
 
 @Composable
 fun ProfileScreen(viewModel: ProfileViewModel) {
     val userStats by viewModel.userStats.collectAsState()
     ProfileScreenContent(userStats)
-}
-
-@Preview
-@Composable
-fun ProfilePreview() {
-    FitcheckTheme {
-        ProfileScreenContent(
-            userStats = UserStatsEntity(
-                level = 15,
-                totalXp = 14500,
-                currentStreak = 8,
-                totalWorkouts = 120
-            )
-        )
-    }
 }
 
 @Composable
@@ -57,90 +38,139 @@ fun ProfileScreenContent(userStats: UserStatsEntity) {
     ) {
         item {
             Spacer(Modifier.height(48.dp))
-            ProfileHeader(level = userStats.level)
+            AthleteHeader(userStats)
         }
         
         item {
-            XPBar(
-                currentXp = userStats.totalXp.toInt() % 1000,
-                nextLevelXp = 1000,
-                level = userStats.level,
-                modifier = Modifier.fillMaxWidth()
-            )
+            StrengthScoreSection()
         }
         
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ProfileStatCard("ATHLETIC STREAK", userStats.currentStreak.toString(), Icons.Default.LocalFireDepartment, Color(0xFFFF5722), Modifier.weight(1f))
-                ProfileStatCard("TOTAL SESSIONS", userStats.totalWorkouts.toString(), Icons.Default.EmojiEvents, PrestigeGold, Modifier.weight(1f))
-            }
+            AthleteMetricsGrid(userStats)
         }
         
         item {
-            AchievementSection()
+            PerformanceRanksSection()
         }
     }
 }
 
 @Composable
-fun ProfileHeader(level: Int) {
+fun AthleteHeader(userStats: UserStatsEntity) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier.size(110.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.size(90.dp).clip(CircleShape).background(Color.DarkGray.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Person, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Icon(Icons.Default.Person, null, modifier = Modifier.size(56.dp), tint = Color.Gray)
         }
-        Spacer(Modifier.height(20.dp))
-        Text("ATHLETIC IDENTITY", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        Text("ATHLETE IDENTITY", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
         Text("CHAMPION", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
-        Text("TIER $level ELITE", style = MaterialTheme.typography.titleMedium, color = PrestigeGold, fontWeight = FontWeight.Bold)
+        Text("TIER ${userStats.level} ATHLETE", style = MaterialTheme.typography.titleMedium, color = EliteWhite, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun ProfileStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, iconColor: Color, modifier: Modifier = Modifier) {
+fun StrengthScoreSection() {
+    Surface(
+        color = Color.DarkGray.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("STRENGTH SCORE", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                ScoreBar("PUSH", 68)
+                ScoreBar("PULL", 42)
+                ScoreBar("LEGS", 85)
+            }
+        }
+    }
+}
+
+@Composable
+fun ScoreBar(label: String, value: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(80.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Spacer(Modifier.height(8.dp))
+        Box(modifier = Modifier.size(50.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                progress = { value / 100f },
+                modifier = Modifier.fillMaxSize(),
+                color = EliteWhite,
+                strokeWidth = 4.dp,
+                trackColor = Color.DarkGray.copy(alpha = 0.3f),
+            )
+            Text("$value", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun AthleteMetricsGrid(userStats: UserStatsEntity) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MetricCard("LIFETIME VOLUME", String.format(java.util.Locale.getDefault(), "%.1fM kg", userStats.totalXp / 1000000.0), Modifier.weight(1f))
+            MetricCard("TOTAL SESSIONS", userStats.totalWorkouts.toString(), Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.1f)),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
     ) {
-        Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, tint = iconColor, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AchievementSection() {
+fun PerformanceRanksSection() {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("PRESTIGE BADGES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("PERFORMANCE RANKS", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
         Spacer(Modifier.height(16.dp))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            BadgeItem("7 DAY STREAK")
-            BadgeItem("1000KG CLUB")
-            BadgeItem("NIGHT OWL")
-            BadgeItem("EARLY RISER")
-        }
+        RankItem("BENCH PRESS", "ADVANCED")
+        RankItem("DEADLIFT", "INTERMEDIATE")
+        RankItem("SQUAT", "ELITE")
     }
 }
 
 @Composable
-fun BadgeItem(label: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+fun RankItem(name: String, rank: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        Surface(
+            color = if (rank == "ELITE") Color(0xFFD4AF37).copy(alpha = 0.2f) else Color.DarkGray.copy(alpha = 0.3f),
+            shape = RoundedCornerShape(4.dp)
+        ) {
+            Text(rank, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Preview
+@Composable
+fun ProfilePreview() {
+    FitcheckTheme {
+        ProfileScreenContent(
+            userStats = UserStatsEntity(
+                level = 15,
+                totalXp = 1450000,
+                currentStreak = 8,
+                totalWorkouts = 120
+            )
+        )
     }
 }

@@ -26,7 +26,8 @@ import com.al32.fitcheck.ui.viewmodel.LibraryViewModel
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onStartTemplate: (WorkoutEntity) -> Unit,
-    onEditTemplate: (WorkoutEntity) -> Unit
+    onEditTemplate: (WorkoutEntity) -> Unit,
+    onCreateNewTemplate: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -39,7 +40,7 @@ fun LibraryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* New Template */ },
+                onClick = onCreateNewTemplate,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {

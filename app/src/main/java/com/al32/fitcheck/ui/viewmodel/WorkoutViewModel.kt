@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.al32.fitcheck.data.local.entities.ExerciseEntity
 import com.al32.fitcheck.data.local.entities.SetEntity
 import com.al32.fitcheck.data.repository.FitcheckRepository
+import com.al32.fitcheck.domain.physiology.PhysiologyProvider
+import com.al32.fitcheck.domain.scoring.StrengthScorer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -16,7 +18,6 @@ data class WorkoutUiState(
     val totalVolume: Double = 0.0,
     val completedSets: Int = 0,
     val totalSets: Int = 0,
-    val xpGained: Int = 0,
     val isExercisePickerOpen: Boolean = false,
     val searchResults: List<ExerciseEntity> = emptyList(),
     val recentPr: SetEntity? = null,
@@ -27,7 +28,6 @@ data class WorkoutUiState(
 data class WorkoutSummary(
     val totalVolume: Double,
     val totalSets: Int,
-    val xpGained: Int,
     val durationSeconds: Long,
     val prCount: Int
 )
@@ -57,7 +57,6 @@ class WorkoutViewModel(
     }
 
     init {
-        // Restore state from handle
         val restoredId = savedStateHandle.get<Long>(KEY_WORKOUT_ID)
         val restoredTime = savedStateHandle.get<Long>(KEY_ELAPSED_TIME) ?: 0L
         val restoredPicker = savedStateHandle.get<Boolean>(KEY_IS_PICKER_OPEN) ?: false
@@ -69,7 +68,6 @@ class WorkoutViewModel(
         ) }
 
         if (restoredId != null) startTimer(restoredTime)
-        
         initWorkoutObserver()
     }
 
@@ -84,10 +82,6 @@ class WorkoutViewModel(
                     repository.getExercisesForWorkout(workoutId),
                     repository.getSetsForWorkout(workoutId)
                 ) { exercises, sets ->
-                    exercises to sets
-                }.mapLatest { (exercises, sets) ->
-                    // Performance optimization: Bulk fetch all previous sets once if possible, 
-                    // or at least handle them outside the inner mapping for better responsiveness.
                     exercises.map { exercise ->
                         ExerciseWithSets(
                             exercise = exercise,
@@ -102,14 +96,12 @@ class WorkoutViewModel(
                 val totalSets = exercisesWithSets.sumOf { it.sets.size }
                 val completedSets = exercisesWithSets.sumOf { it.sets.count { s -> s.isCompleted } }
                 
-                _uiState.update { 
-                    it.copy(
-                        exercises = exercisesWithSets,
-                        totalVolume = totalVolume,
-                        totalSets = totalSets,
-                        completedSets = completedSets
-                    )
-                }
+                _uiState.update { it.copy(
+                    exercises = exercisesWithSets,
+                    totalVolume = totalVolume,
+                    totalSets = totalSets,
+                    completedSets = completedSets
+                ) }
             }
             .launchIn(viewModelScope)
     }
@@ -132,7 +124,6 @@ class WorkoutViewModel(
     fun resumeWorkout(workoutId: Long) {
         savedStateHandle[KEY_WORKOUT_ID] = workoutId
         _uiState.update { it.copy(workoutId = workoutId) }
-        // Attempt to restore elapsed time or start from 0 if unknown
         startTimer(_uiState.value.elapsedTime)
     }
 
@@ -172,6 +163,13 @@ class WorkoutViewModel(
         }
     }
 
+    fun removeExercise(exerciseId: Long) {
+        val workoutId = _uiState.value.workoutId ?: return
+        viewModelScope.launch {
+            repository.removeExerciseFromWorkout(workoutId, exerciseId)
+        }
+    }
+
     fun addSet(exerciseId: Long) {
         val workoutId = _uiState.value.workoutId ?: return
         viewModelScope.launch {
@@ -202,22 +200,13 @@ class WorkoutViewModel(
     private suspend fun handleSetCompletion(setId: Long, weight: Double, reps: Int) {
         val set = _uiState.value.exercises.flatMap { it.sets }.find { it.id == setId } ?: return
         startRestTimer(90)
-        val pr = repository.getPersonalRecord(set.exerciseId)
         
-        var isNewPr = false
-        if (pr == null || weight > pr.weight || (weight == pr.weight && reps > pr.reps)) {
-            isNewPr = true
+        val pr = repository.getPersonalRecord(set.exerciseId)
+        val currentMax = StrengthScorer.estimateOneRepMax(weight, reps)
+        val prevMax = pr?.let { StrengthScorer.estimateOneRepMax(it.weight, it.reps) } ?: 0.0
+        
+        if (currentMax > prevMax) {
             repository.updateSet(setId, reps, weight, true, true)
-        }
-
-        _uiState.update { it.copy(
-            xpGained = it.xpGained + if (isNewPr) 50 else 10,
-            recentPr = if (isNewPr) set.copy(weight = weight, reps = reps, isPr = true) else it.recentPr
-        ) }
-
-        if (isNewPr) {
-            delay(3000)
-            _uiState.update { it.copy(recentPr = null) }
         }
     }
 
@@ -239,20 +228,11 @@ class WorkoutViewModel(
         _uiState.update { it.copy(restTimerSeconds = null) }
     }
 
-    fun reorderExercise(fromIndex: Int, toIndex: Int) {
-        val exercises = _uiState.value.exercises.toMutableList()
-        if (fromIndex !in exercises.indices || toIndex !in exercises.indices) return
-        
-        val item = exercises.removeAt(fromIndex)
-        exercises.add(toIndex, item)
-        
-        _uiState.update { it.copy(exercises = exercises) }
-        
+    fun saveAsTemplate(name: String) {
         val workoutId = _uiState.value.workoutId ?: return
         viewModelScope.launch {
-            exercises.forEachIndexed { index, ex ->
-                repository.reorderExercise(workoutId, ex.exercise.id, index)
-            }
+            repository.updateTemplateName(workoutId, name)
+            _uiState.update { WorkoutUiState() }
         }
     }
 
@@ -263,13 +243,12 @@ class WorkoutViewModel(
         val summary = WorkoutSummary(
             totalVolume = state.totalVolume,
             totalSets = state.totalSets,
-            xpGained = state.xpGained,
             durationSeconds = state.elapsedTime,
             prCount = state.exercises.flatMap { it.sets }.count { it.isPr }
         )
 
         viewModelScope.launch {
-            repository.finishWorkout(workoutId, state.xpGained)
+            repository.finishWorkout(workoutId, 0) // XP system removed
             timerJob?.cancel()
             savedStateHandle.remove<Long>(KEY_WORKOUT_ID)
             _uiState.update { it.copy(summary = summary, workoutId = null) }

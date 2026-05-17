@@ -36,7 +36,7 @@ fun AnalyticsPreview() {
                 totalWorkouts = 42,
                 totalVolume = 125400.0,
                 muscleIntensity = mapOf("Chest" to 0.9f, "Back" to 0.4f, "Legs" to 0.7f),
-                volumeHistory = listOf(1L to 3000.0, 2L to 4000.0, 3L to 3500.0)
+                volumeHistory = listOf("Mon" to 3000.0, "Tue" to 4000.0, "Wed" to 3500.0)
             )
         )
     }
@@ -99,8 +99,9 @@ fun AnalyticsScreenContent(uiState: AnalyticsUiState) {
             }
             
             item {
+                // Simplified legacy mapping for heatmap refactor
                 BodyHeatmap(
-                    muscleIntensity = uiState.muscleIntensity,
+                    muscleStates = emptyMap(),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

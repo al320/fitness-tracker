@@ -1,10 +1,8 @@
 package com.al32.fitcheck.ui.features.dashboard
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,17 +10,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.al32.fitcheck.data.local.entities.UserStatsEntity
-import com.al32.fitcheck.ui.components.XPBar
-import com.al32.fitcheck.ui.theme.FitcheckTheme
-import com.al32.fitcheck.ui.theme.PrestigeGold
 import com.al32.fitcheck.data.local.entities.WorkoutEntity
+import com.al32.fitcheck.domain.physiology.MuscleGroup
+import com.al32.fitcheck.ui.components.BodyHeatmap
+import com.al32.fitcheck.ui.theme.FitcheckTheme
+import com.al32.fitcheck.ui.theme.EliteWhite
 import com.al32.fitcheck.ui.viewmodel.DashboardUiState
 import com.al32.fitcheck.ui.viewmodel.DashboardViewModel
 
@@ -44,34 +39,38 @@ fun DashboardContent(
     onStartTemplate: (WorkoutEntity) -> Unit,
     uiState: DashboardUiState
 ) {
-    val userStats = uiState.userStats
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onStartWorkout,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
+                containerColor = EliteWhite,
+                contentColor = Color.Black
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Start Workout")
+                Icon(Icons.Default.Add, null)
             }
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                Spacer(modifier = Modifier.height(32.dp))
-                HeaderSection()
+                Spacer(Modifier.height(16.dp))
+                Text("RECOVERY BRIEFING", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
             }
 
             item {
-                QuickStartSection(
+                BodyHeatmap(muscleStates = uiState.muscleStates)
+            }
+
+            if (uiState.recommendations.isNotEmpty()) {
+                item {
+                    RecommendationCard(uiState.recommendations)
+                }
+            }
+
+            item {
+                QuickStartGrid(
                     activeWorkout = uiState.activeWorkout,
                     templates = uiState.templates,
                     onContinue = onContinueWorkout,
@@ -80,175 +79,41 @@ fun DashboardContent(
             }
 
             item {
-                XPBar(
-                    currentXp = userStats.totalXp.toInt() % 1000,
-                    nextLevelXp = 1000,
-                    level = userStats.level,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                MuscleVolumeSection(uiState)
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    StatCard(
-                        label = "STREAK",
-                        value = userStats.currentStreak.toString(),
-                        icon = Icons.Default.LocalFireDepartment,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatCard(
-                        label = "WORKOUTS",
-                        value = userStats.totalWorkouts.toString(),
-                        icon = Icons.Default.History,
-                        modifier = Modifier.weight(1f)
-                    )
+                TrainingStatsRow(uiState)
+            }
+            
+            item { Spacer(Modifier.height(100.dp)) }
+        }
+    }
+}
+
+@Composable
+fun RecommendationCard(recs: List<String>) {
+    Surface(
+        color = Color.DarkGray.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("TRAINING FOCUS", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            recs.forEach { rec ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val color = if (rec.contains("RECOVERY")) Color(0xFFD32F2F) else Color(0xFF00ACC1)
+                    Box(Modifier.size(6.dp).background(color, RoundedCornerShape(3.dp)))
+                    Spacer(Modifier.width(10.dp))
+                    Text(rec, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 }
             }
-
-            item {
-                RecentActivitySection()
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
-            }
         }
     }
 }
 
 @Composable
-fun HeaderSection() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Welcome back,",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "CHAMPION",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Black
-            )
-        }
-        
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Person,
-                contentDescription = "Profile",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun StatCard(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Black
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun RecentActivitySection() {
-    Column {
-        Text(
-            text = "ELITE MILESTONES",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        AchievementItem(
-            title = "HEAVY HITTER",
-            desc = "Bench Press PR: 100kg",
-            icon = Icons.Default.EmojiEvents
-        )
-    }
-}
-
-@Composable
-fun AchievementItem(title: String, desc: String, icon: ImageVector) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = PrestigeGold,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    text = desc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickStartSection(
+fun QuickStartGrid(
     activeWorkout: WorkoutEntity?,
     templates: List<WorkoutEntity>,
     onContinue: (Long) -> Unit,
@@ -256,81 +121,81 @@ fun QuickStartSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (activeWorkout != null) {
-            Card(
+            Button(
                 onClick = { onContinue(activeWorkout.id) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = EliteWhite)
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.PlayArrow, null, tint = Color.Black)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("RESUME SESSION", fontWeight = FontWeight.Black, color = Color.Black)
-                        Text(activeWorkout.name.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.7f))
-                    }
-                }
+                Icon(Icons.Default.PlayArrow, null, tint = Color.Black)
+                Spacer(Modifier.width(8.dp))
+                Text("RESUME: ${activeWorkout.name.uppercase()}", color = Color.Black, fontWeight = FontWeight.Black)
             }
         }
 
-        Text(
-            text = "QUICK START TEMPLATES",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        if (templates.isEmpty()) {
-            Text("No templates yet. Save a workout to see it here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-        }
-
-        templates.take(3).forEach { template ->
-            TemplateCard(template, onClick = { onStartTemplate(template) })
+        Text("QUICK START", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+        templates.take(4).chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { template ->
+                    OutlinedButton(
+                        onClick = { onStartTemplate(template) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
+                    ) {
+                        Text(template.name.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-fun TemplateCard(template: WorkoutEntity, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Bolt, null, tint = PrestigeGold)
-            Spacer(Modifier.width(12.dp))
-            Text(template.name.uppercase(), fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+fun MuscleVolumeSection(uiState: DashboardUiState) {
+    val states = uiState.muscleStates
+    val pushVal = (states[MuscleGroup.LOWER_CHEST]?.fatigueLevel ?: 0f) / 2f
+    val pullVal = (states[MuscleGroup.LATS]?.fatigueLevel ?: 0f) / 2f
+    val legsVal = (states[MuscleGroup.QUADS]?.fatigueLevel ?: 0f) / 2f
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("TRAINING INTENSITY BALANCE", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+        VolumeBar("PUSH PATTERNS", pushVal.coerceIn(0f, 1f))
+        VolumeBar("PULL PATTERNS", pullVal.coerceIn(0f, 1f))
+        VolumeBar("LOWER BODY", legsVal.coerceIn(0f, 1f))
     }
 }
 
-@Preview
 @Composable
-fun DashboardPreview() {
-    FitcheckTheme {
-        DashboardContent(
-            onStartWorkout = {},
-            onContinueWorkout = {},
-            onStartTemplate = {},
-            uiState = DashboardUiState(
-                userStats = UserStatsEntity(
-                    level = 12,
-                    totalXp = 2450,
-                    currentStreak = 5,
-                    totalWorkouts = 28
-                ),
-                templates = listOf(WorkoutEntity(name = "Upper Power", startTime = 0, isTemplate = true))
-            )
+fun VolumeBar(label: String, progress: Float) {
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth().height(4.dp),
+            color = Color(0xFF00ACC1),
+            trackColor = Color.DarkGray.copy(alpha = 0.3f),
         )
+    }
+}
+
+@Composable
+fun TrainingStatsRow(uiState: DashboardUiState) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        SimpleStat("STREAK", "${uiState.userStats.currentStreak}D")
+        SimpleStat("SESSIONS", uiState.userStats.totalWorkouts.toString())
+        SimpleStat("VOLUME", String.format(java.util.Locale.getDefault(), "%.1fM", uiState.userStats.totalXp / 1000000.0))
+    }
+}
+
+@Composable
+fun SimpleStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
     }
 }

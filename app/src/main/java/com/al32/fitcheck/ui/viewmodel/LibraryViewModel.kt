@@ -36,7 +36,14 @@ class LibraryViewModel(
 
     fun duplicateTemplate(template: WorkoutEntity) {
         viewModelScope.launch {
-            repository.startWorkout(template.name + " (Copy)", isTemplate = true)
+            repository.duplicateTemplate(template.id)
+        }
+    }
+
+    fun createTemplate(name: String, onComplete: (Long) -> Unit) {
+        viewModelScope.launch {
+            val id = repository.startWorkout(name, isTemplate = true)
+            onComplete(id)
         }
     }
 }

@@ -37,6 +37,9 @@ interface SetDao {
     @Delete
     suspend fun deleteSet(set: SetEntity)
 
+    @Query("SELECT * FROM sets WHERE isCompleted = 1")
+    fun getAllCompletedSets(): Flow<List<SetEntity>>
+
     @Query("SELECT * FROM sets WHERE exerciseId = :exerciseId ORDER BY timestamp DESC")
     fun getHistoryForExercise(exerciseId: Long): Flow<List<SetEntity>>
 

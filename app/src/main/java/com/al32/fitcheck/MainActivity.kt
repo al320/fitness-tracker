@@ -32,6 +32,7 @@ import com.al32.fitcheck.ui.features.analytics.AnalyticsScreen
 import com.al32.fitcheck.ui.features.dashboard.DashboardScreen
 import com.al32.fitcheck.ui.features.exercise_detail.ExerciseDetailScreen
 import com.al32.fitcheck.ui.features.library.LibraryScreen
+import com.al32.fitcheck.ui.features.library.TemplateEditScreen
 import com.al32.fitcheck.ui.features.profile.ProfileScreen
 import com.al32.fitcheck.ui.features.settings.SettingsScreen
 import com.al32.fitcheck.ui.features.workout.WorkoutScreen
@@ -182,7 +183,22 @@ fun FitcheckApp() {
                         workoutViewModel.startWorkout(template.name, template.id)
                         navController.navigate("workout")
                     },
-                    onEditTemplate = { /* template -> navController.navigate("template_edit/${template.id}") */ }
+                    onEditTemplate = { template ->
+                        workoutViewModel.resumeWorkout(template.id)
+                        navController.navigate("template_edit")
+                    },
+                    onCreateNewTemplate = {
+                        libraryViewModel.createTemplate("NEW TEMPLATE") { id ->
+                            workoutViewModel.resumeWorkout(id)
+                            navController.navigate("template_edit")
+                        }
+                    }
+                )
+            }
+            composable("template_edit") {
+                TemplateEditScreen(
+                    viewModel = workoutViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("settings") {
