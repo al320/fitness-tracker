@@ -4,36 +4,64 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.al32.fitcheck.data.local.dao.ExerciseDao
-import com.al32.fitcheck.data.local.dao.SetDao
-import com.al32.fitcheck.data.local.dao.UserStatsDao
-import com.al32.fitcheck.data.local.dao.WorkoutDao
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.SetEntity
-import com.al32.fitcheck.data.local.entities.UserStatsEntity
-import com.al32.fitcheck.data.local.entities.WorkoutEntity
-import com.al32.fitcheck.data.local.entities.WorkoutExerciseEntity
+import androidx.room.TypeConverters
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.al32.fitcheck.data.local.dao.*
+import com.al32.fitcheck.data.local.entities.*
+import com.al32.fitcheck.domain.physiology.ExerciseSeedData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+import androidx.room.migration.Migration
 
 @Database(
     entities = [
-        WorkoutEntity::class,
-        ExerciseEntity::class,
-        SetEntity::class,
-        UserStatsEntity::class,
-        WorkoutExerciseEntity::class
+        WorkoutSession::class,
+        Exercise::class,
+        ExerciseEntry::class,
+        SetEntry::class,
+        WorkoutTemplate::class,
+        TemplateExercise::class,
+        PersonalRecord::class,
+        WeeklyScheduleDay::class
     ],
-    version = 1,
+    version = 7, // Added isCompleted to WorkoutSession
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun exerciseDao(): ExerciseDao
     abstract fun setDao(): SetDao
-    abstract fun userStatsDao(): UserStatsDao
+    abstract fun templateDao(): TemplateDao
+    abstract fun prDao(): PRDao
+    abstract fun weeklyScheduleDao(): WeeklyScheduleDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create weekly_schedule table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `weekly_schedule` (
+                        `dayOfWeek` INTEGER NOT NULL, 
+                        `templateId` TEXT, 
+                        `isRestDay` INTEGER NOT NULL, 
+                        PRIMARY KEY(`dayOfWeek`)
+                    )
+                """.trimIndent())
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add isCompleted column to workout_sessions
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -41,7 +69,17 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "fitcheck_database"
-                ).build()
+                )
+                .addCallback(object : Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            getDatabase(context).exerciseDao().insertExercises(ExerciseSeedData.exercises)
+                        }
+                    }
+                })
+                .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                .build()
                 INSTANCE = instance
                 instance
             }

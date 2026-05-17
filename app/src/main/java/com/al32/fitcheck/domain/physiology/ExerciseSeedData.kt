@@ -1,0 +1,361 @@
+package com.al32.fitcheck.domain.physiology
+
+import com.al32.fitcheck.data.local.entities.Exercise
+
+object ExerciseSeedData {
+    val exercises = listOf(
+        
+        // ── CHEST ──
+        Exercise(id = "barbell_bench_press", name = "Barbell Bench Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "incline_bench_press", name = "Incline Bench Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "decline_bench_press", name = "Decline Bench Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_LOWER),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "db_flat_press", name = "Dumbbell Flat Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "db_incline_press", name = "Dumbbell Incline Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "cable_fly", name = "Cable Fly",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "pec_deck", name = "Pec Deck",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "dips", name = "Dips",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_LOWER, MuscleGroup.TRICEPS),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "chest_press_machine", name = "Machine Chest Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_LOWER, MuscleGroup.CHEST_UPPER),
+            secondaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "push_up", name = "Push Up",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.CHEST_LOWER, MuscleGroup.CHEST_UPPER),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS, MuscleGroup.FRONT_DELT),
+            cnsLoad = CNSLoad.LOW),
+
+        // ── BACK ──
+        Exercise(id = "deadlift", name = "Deadlift",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.LOWER_BACK, MuscleGroup.LATS),
+            secondaryMuscles = listOf(MuscleGroup.UPPER_BACK, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "romanian_deadlift", name = "Romanian Deadlift",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.LOWER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "barbell_row", name = "Barbell Row",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS, MuscleGroup.REAR_DELT),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "pullup", name = "Pull-Up",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.LATS),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "lat_pulldown", name = "Lat Pulldown",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.LATS),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "seated_cable_row", name = "Seated Cable Row",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.UPPER_BACK, MuscleGroup.LATS),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS, MuscleGroup.REAR_DELT),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "face_pull", name = "Face Pull",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.REAR_DELT, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "t_bar_row", name = "T-Bar Row",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "single_arm_db_row", name = "Single Arm DB Row",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "straight_arm_pulldown", name = "Straight Arm Pulldown",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.LATS),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.LOW),
+
+        // ── SHOULDERS ──
+        Exercise(id = "overhead_press", name = "Overhead Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.SIDE_DELT),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS, MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "db_shoulder_press", name = "Dumbbell Shoulder Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.SIDE_DELT),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "lateral_raise", name = "Lateral Raise",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.SIDE_DELT),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "front_raise", name = "Front Raise",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.FRONT_DELT),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "reverse_fly", name = "Reverse Fly",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.REAR_DELT),
+            secondaryMuscles = listOf(MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "arnold_press", name = "Arnold Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.SIDE_DELT),
+            secondaryMuscles = listOf(MuscleGroup.TRICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "upright_row", name = "Upright Row",
+            movementPattern = MovementPattern.PULL,
+            primaryMuscles = listOf(MuscleGroup.SIDE_DELT, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.BICEPS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        // ── ARMS ──
+        Exercise(id = "barbell_curl", name = "Barbell Curl",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.BICEPS),
+            secondaryMuscles = listOf(MuscleGroup.FOREARMS),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "db_curl", name = "Dumbbell Curl",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.BICEPS),
+            secondaryMuscles = listOf(MuscleGroup.FOREARMS),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "hammer_curl", name = "Hammer Curl",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.BICEPS, MuscleGroup.FOREARMS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "preacher_curl", name = "Preacher Curl",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.BICEPS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "tricep_pushdown", name = "Tricep Pushdown",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.TRICEPS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "overhead_tricep_ext", name = "Overhead Tricep Extension",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.TRICEPS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "skull_crusher", name = "Skull Crusher",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.TRICEPS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "close_grip_bench", name = "Close Grip Bench Press",
+            movementPattern = MovementPattern.PUSH,
+            primaryMuscles = listOf(MuscleGroup.TRICEPS),
+            secondaryMuscles = listOf(MuscleGroup.CHEST_LOWER, MuscleGroup.FRONT_DELT),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        // ── LEGS ──
+        Exercise(id = "barbell_squat", name = "Barbell Squat",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.LOWER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "front_squat", name = "Front Squat",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS),
+            secondaryMuscles = listOf(MuscleGroup.GLUTES, MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "leg_press", name = "Leg Press",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "hack_squat", name = "Hack Squat",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS),
+            secondaryMuscles = listOf(MuscleGroup.GLUTES),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "leg_extension", name = "Leg Extension",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.QUADS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "leg_curl", name = "Leg Curl",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.HAMSTRINGS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "romanian_db_deadlift", name = "DB Romanian Deadlift",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.LOWER_BACK),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "bulgarian_split_squat", name = "Bulgarian Split Squat",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "hip_thrust", name = "Hip Thrust",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "calf_raise", name = "Calf Raise",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.CALVES),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "lunge", name = "Lunge",
+            movementPattern = MovementPattern.SQUAT,
+            primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS),
+            cnsLoad = CNSLoad.LOW),
+
+        // ── CORE ──
+        Exercise(id = "plank", name = "Plank",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.ABS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "crunch", name = "Crunch",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.ABS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "cable_crunch", name = "Cable Crunch",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.ABS),
+            secondaryMuscles = emptyList(),
+            cnsLoad = CNSLoad.LOW),
+
+        Exercise(id = "hanging_leg_raise", name = "Hanging Leg Raise",
+            movementPattern = MovementPattern.ISOLATION,
+            primaryMuscles = listOf(MuscleGroup.ABS),
+            secondaryMuscles = listOf(MuscleGroup.FOREARMS),
+            cnsLoad = CNSLoad.LOW),
+
+        // ── COMPOUND CARRIES ──
+        Exercise(id = "farmers_walk", name = "Farmer's Walk",
+            movementPattern = MovementPattern.CARRY,
+            primaryMuscles = listOf(MuscleGroup.FOREARMS, MuscleGroup.UPPER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.CALVES),
+            cnsLoad = CNSLoad.MEDIUM),
+
+        Exercise(id = "trap_bar_deadlift", name = "Trap Bar Deadlift",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.UPPER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+
+        Exercise(id = "sumo_deadlift", name = "Sumo Deadlift",
+            movementPattern = MovementPattern.HINGE,
+            primaryMuscles = listOf(MuscleGroup.GLUTES, MuscleGroup.QUADS),
+            secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.LOWER_BACK),
+            cnsLoad = CNSLoad.HIGH),
+            
+        // Adding more to reach ~80
+        Exercise(id = "seated_db_press", name = "Seated DB Shoulder Press", movementPattern = MovementPattern.PUSH, primaryMuscles = listOf(MuscleGroup.FRONT_DELT), secondaryMuscles = listOf(MuscleGroup.TRICEPS), cnsLoad = CNSLoad.MEDIUM),
+        Exercise(id = "cable_row_vbar", name = "V-Bar Cable Row", movementPattern = MovementPattern.PULL, primaryMuscles = listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK), secondaryMuscles = listOf(MuscleGroup.BICEPS), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "goblet_squat", name = "Goblet Squat", movementPattern = MovementPattern.SQUAT, primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES), secondaryMuscles = listOf(MuscleGroup.ABS), cnsLoad = CNSLoad.MEDIUM),
+        Exercise(id = "barbell_shrug", name = "Barbell Shrug", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.UPPER_BACK), secondaryMuscles = listOf(MuscleGroup.FOREARMS), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "db_shrug", name = "Dumbbell Shrug", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.UPPER_BACK), secondaryMuscles = listOf(MuscleGroup.FOREARMS), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "reverse_curl", name = "Reverse Barbell Curl", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.FOREARMS), secondaryMuscles = listOf(MuscleGroup.BICEPS), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "wrist_curl", name = "Wrist Curl", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.FOREARMS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "hyperextension", name = "Hyperextension", movementPattern = MovementPattern.HINGE, primaryMuscles = listOf(MuscleGroup.LOWER_BACK), secondaryMuscles = listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "leg_press_calf_raise", name = "Leg Press Calf Raise", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.CALVES), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "machine_fly", name = "Machine Fly", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.CHEST_LOWER), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "low_cable_fly", name = "Low Cable Fly", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.CHEST_UPPER), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "high_cable_fly", name = "High Cable Fly", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.CHEST_LOWER), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "concentration_curl", name = "Concentration Curl", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.BICEPS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "tricep_kickback", name = "Tricep Kickback", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.TRICEPS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "bench_dip", name = "Bench Dip", movementPattern = MovementPattern.PUSH, primaryMuscles = listOf(MuscleGroup.TRICEPS), secondaryMuscles = listOf(MuscleGroup.CHEST_LOWER, MuscleGroup.FRONT_DELT), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "step_up", name = "Step Up", movementPattern = MovementPattern.SQUAT, primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "box_squat", name = "Box Squat", movementPattern = MovementPattern.SQUAT, primaryMuscles = listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES), secondaryMuscles = listOf(MuscleGroup.LOWER_BACK), cnsLoad = CNSLoad.HIGH),
+        Exercise(id = "deficit_deadlift", name = "Deficit Deadlift", movementPattern = MovementPattern.HINGE, primaryMuscles = listOf(MuscleGroup.LOWER_BACK, MuscleGroup.GLUTES), secondaryMuscles = listOf(MuscleGroup.HAMSTRINGS), cnsLoad = CNSLoad.HIGH),
+        Exercise(id = "rack_pull", name = "Rack Pull", movementPattern = MovementPattern.HINGE, primaryMuscles = listOf(MuscleGroup.UPPER_BACK, MuscleGroup.LATS), secondaryMuscles = listOf(MuscleGroup.LOWER_BACK), cnsLoad = CNSLoad.HIGH),
+        Exercise(id = "landmine_press", name = "Landmine Press", movementPattern = MovementPattern.PUSH, primaryMuscles = listOf(MuscleGroup.FRONT_DELT, MuscleGroup.CHEST_UPPER), secondaryMuscles = listOf(MuscleGroup.TRICEPS), cnsLoad = CNSLoad.MEDIUM),
+        Exercise(id = "overhead_db_ext_single", name = "Single Arm DB Overhead Extension", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.TRICEPS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "side_plank", name = "Side Plank", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.ABS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "russian_twist", name = "Russian Twist", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.ABS), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "woodchopper", name = "Cable Woodchopper", movementPattern = MovementPattern.ISOLATION, primaryMuscles = listOf(MuscleGroup.ABS), secondaryMuscles = listOf(MuscleGroup.FRONT_DELT), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "face_pull_cable", name = "Cable Face Pull", movementPattern = MovementPattern.PULL, primaryMuscles = listOf(MuscleGroup.REAR_DELT, MuscleGroup.UPPER_BACK), secondaryMuscles = emptyList(), cnsLoad = CNSLoad.LOW),
+        Exercise(id = "pendlay_row", name = "Pendlay Row", movementPattern = MovementPattern.PULL, primaryMuscles = listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK), secondaryMuscles = listOf(MuscleGroup.BICEPS), cnsLoad = CNSLoad.HIGH)
+    )
+}

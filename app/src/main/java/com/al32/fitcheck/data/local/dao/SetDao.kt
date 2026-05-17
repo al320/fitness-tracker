@@ -1,70 +1,91 @@
 package com.al32.fitcheck.data.local.dao
 
 import androidx.room.*
-import com.al32.fitcheck.data.local.entities.SetEntity
+import com.al32.fitcheck.data.local.entities.SetEntry
+import com.al32.fitcheck.domain.physiology.MuscleGroup
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SetDao {
-    @Query("SELECT * FROM sets WHERE workoutId = :workoutId")
-    fun getSetsForWorkout(workoutId: Long): Flow<List<SetEntity>>
-
-    @Query("UPDATE sets SET reps = :reps, weight = :weight, isPr = :isPr, isCompleted = :isCompleted WHERE id = :setId")
-    suspend fun updateSetData(setId: Long, reps: Int, weight: Double, isPr: Boolean, isCompleted: Boolean)
-
-    @Query("SELECT * FROM sets WHERE exerciseId = :exerciseId AND isCompleted = 1 ORDER BY weight DESC, reps DESC LIMIT 1")
-    suspend fun getPersonalRecord(exerciseId: Long): SetEntity?
-
-    @Query("""
-        SELECT * FROM sets 
-        WHERE exerciseId = :exerciseId AND workoutId != :currentWorkoutId AND isCompleted = 1 
-        ORDER BY timestamp DESC LIMIT :limit
-    """)
-    suspend fun getPreviousPerformance(exerciseId: Long, currentWorkoutId: Long, limit: Int = 5): List<SetEntity>
-
-    @Query("SELECT * FROM sets")
-    suspend fun getAllSetsSync(): List<SetEntity>
+    @Query("SELECT * FROM set_entries WHERE exerciseEntryId = :exerciseEntryId")
+    fun getSetsForEntry(exerciseEntryId: String): Flow<List<SetEntry>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSets(sets: List<SetEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSet(set: SetEntity): Long
+    suspend fun insertSet(set: SetEntry)
 
     @Update
-    suspend fun updateSet(set: SetEntity)
+    suspend fun updateSet(set: SetEntry)
 
     @Delete
-    suspend fun deleteSet(set: SetEntity)
-
-    @Query("SELECT * FROM sets WHERE isCompleted = 1")
-    fun getAllCompletedSets(): Flow<List<SetEntity>>
-
-    @Query("SELECT * FROM sets WHERE exerciseId = :exerciseId ORDER BY timestamp DESC")
-    fun getHistoryForExercise(exerciseId: Long): Flow<List<SetEntity>>
+    suspend fun deleteSet(set: SetEntry)
 
     @Query("""
-        SELECT date(timestamp/1000, 'unixepoch') as day, SUM(weight * reps) as volume 
-        FROM sets 
-        WHERE isCompleted = 1 
-        GROUP BY day 
-        ORDER BY day DESC 
-        LIMIT 30
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries e ON s.exerciseEntryId = e.id
+        WHERE e.exerciseId = :exerciseId AND s.isCompleted = 1
+        ORDER BY s.completedAt DESC
     """)
-    fun getDailyVolumeHistory(): Flow<List<VolumeHistory>>
+    fun getHistoryForExercise(exerciseId: String): Flow<List<SetEntry>>
 
     @Query("""
-        SELECT e.muscleGroup, SUM(s.weight * s.reps) as intensity
-        FROM sets s
-        JOIN exercises e ON s.exerciseId = e.id
-        WHERE s.isCompleted = 1 AND s.timestamp > :since
-        GROUP BY e.muscleGroup
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries e ON s.exerciseEntryId = e.id
+        WHERE e.exerciseId = :exerciseId AND s.isCompleted = 1
+        ORDER BY s.completedAt DESC LIMIT 1
     """)
-    fun getMuscleIntensity(since: Long): Flow<List<MuscleIntensity>>
+    suspend fun getPersonalRecord(exerciseId: String): SetEntry?
 
-    @Query("SELECT SUM(weight * reps) FROM sets WHERE isCompleted = 1")
-    fun getTotalVolume(): Flow<Double?>
+    @Query("""
+        SELECT s.weight, s.reps, s.completedAt, ex.primaryMuscles, ex.secondaryMuscles 
+        FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        JOIN exercises ex ON ee.exerciseId = ex.id
+        WHERE s.isCompleted = 1 AND s.completedAt > :since
+    """)
+    fun getCompletedSetsWithPhysiology(since: Long): Flow<List<SetWithPhysiology>>
+
+    @Query("""
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries e ON s.exerciseEntryId = e.id
+        WHERE e.exerciseId = :exerciseId AND s.isCompleted = 1
+        AND e.sessionId != :currentSessionId
+        ORDER BY s.completedAt DESC LIMIT :limit
+    """)
+    fun getPreviousPerformance(exerciseId: String, currentSessionId: String, limit: Int = 5): Flow<List<SetEntry>>
+
+    @Query("SELECT * FROM set_entries WHERE exerciseEntryId = :exerciseEntryId")
+    fun getSetsForEntrySync(exerciseEntryId: String): Flow<List<SetEntry>>
+
+    @Query("""
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        WHERE ee.sessionId = :sessionId
+    """)
+    fun getSetsForSession(sessionId: String): Flow<List<SetEntry>>
+
+    @Query("""
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        WHERE ee.exerciseId = :exerciseId
+    """)
+    fun getSetsForExercise(exerciseId: String): Flow<List<SetEntry>>
+
+    @Query("""
+        SELECT ee.exerciseId as exerciseId, MAX(s.weight * (1 + s.reps / 30.0)) as bestE1RM
+        FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        WHERE s.isCompleted = 1 AND s.completedAt > :since
+        GROUP BY ee.exerciseId
+    """)
+    fun getBestE1RMPerExercise(since: Long): Flow<List<ExerciseBest1RM>>
 }
 
-data class VolumeHistory(val day: String, val volume: Double)
-data class MuscleIntensity(val muscleGroup: String, val intensity: Double)
+data class SetWithPhysiology(
+    val weight: Float,
+    val reps: Int,
+    val completedAt: Long,
+    val primaryMuscles: List<MuscleGroup>,
+    val secondaryMuscles: List<MuscleGroup>
+)
+
+data class ExerciseBest1RM(val exerciseId: String, val bestE1RM: Float)

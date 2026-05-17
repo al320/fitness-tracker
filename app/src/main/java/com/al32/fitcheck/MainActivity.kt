@@ -4,21 +4,26 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.*
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -31,10 +36,13 @@ import com.al32.fitcheck.data.preferences.UserPreferencesRepository
 import com.al32.fitcheck.ui.features.analytics.AnalyticsScreen
 import com.al32.fitcheck.ui.features.dashboard.DashboardScreen
 import com.al32.fitcheck.ui.features.exercise_detail.ExerciseDetailScreen
+import com.al32.fitcheck.ui.features.library.CreateCustomExerciseScreen
 import com.al32.fitcheck.ui.features.library.LibraryScreen
 import com.al32.fitcheck.ui.features.library.TemplateEditScreen
 import com.al32.fitcheck.ui.features.profile.ProfileScreen
 import com.al32.fitcheck.ui.features.settings.SettingsScreen
+import com.al32.fitcheck.ui.features.settings.WeeklyScheduleScreen
+import com.al32.fitcheck.ui.features.workout.SessionSummaryScreen
 import com.al32.fitcheck.ui.features.workout.WorkoutScreen
 import com.al32.fitcheck.ui.theme.FitcheckTheme
 import com.al32.fitcheck.ui.viewmodel.*
@@ -59,9 +67,19 @@ fun FitcheckApp() {
     val repository = app.repository
     val preferencesRepository = UserPreferencesRepository(context)
 
+    val strengthScoreViewModel: StrengthScoreViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return StrengthScoreViewModel(repository, preferencesRepository) as T
+            }
+        }
+    )
+
     val dashboardViewModel: DashboardViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return DashboardViewModel(repository, SavedStateHandle()) as T
             }
         }
@@ -70,6 +88,7 @@ fun FitcheckApp() {
     val workoutViewModel: WorkoutViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return WorkoutViewModel(repository, SavedStateHandle()) as T
             }
         }
@@ -78,6 +97,7 @@ fun FitcheckApp() {
     val analyticsViewModel: AnalyticsViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return AnalyticsViewModel(repository) as T
             }
         }
@@ -86,7 +106,8 @@ fun FitcheckApp() {
     val profileViewModel: ProfileViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return ProfileViewModel(repository) as T
+                @Suppress("UNCHECKED_CAST")
+                return ProfileViewModel(repository, preferencesRepository, strengthScoreViewModel) as T
             }
         }
     )
@@ -94,6 +115,7 @@ fun FitcheckApp() {
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return LibraryViewModel(repository, SavedStateHandle()) as T
             }
         }
@@ -102,6 +124,7 @@ fun FitcheckApp() {
     val settingsViewModel: SettingsViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
                 return SettingsViewModel(repository, preferencesRepository) as T
             }
         }
@@ -136,8 +159,8 @@ fun FitcheckApp() {
                                 }
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                selectedIconColor = Color(0xFFFF851B),
+                                selectedTextColor = Color(0xFFFF851B),
                                 unselectedIconColor = Color.Gray,
                                 unselectedTextColor = Color.Gray,
                                 indicatorColor = Color.Transparent
@@ -151,7 +174,23 @@ fun FitcheckApp() {
         NavHost(
             navController = navController,
             startDestination = "dashboard",
-            modifier = Modifier.padding(if (showBottomBar) innerPadding else PaddingValues(0.dp))
+            modifier = Modifier.padding(if (showBottomBar) innerPadding else PaddingValues(0.dp)),
+            enterTransition = {
+                fadeIn(tween(180)) + slideInHorizontally(
+                    initialOffsetX = { it / 5 }, animationSpec = tween(180, easing = EaseOut))
+            },
+            exitTransition = {
+                fadeOut(tween(130)) + slideOutHorizontally(
+                    targetOffsetX = { -it / 5 }, animationSpec = tween(130, easing = EaseIn))
+            },
+            popEnterTransition = {
+                fadeIn(tween(180)) + slideInHorizontally(
+                    initialOffsetX = { -it / 5 }, animationSpec = tween(180, easing = EaseOut))
+            },
+            popExitTransition = {
+                fadeOut(tween(130)) + slideOutHorizontally(
+                    targetOffsetX = { it / 5 }, animationSpec = tween(130, easing = EaseIn))
+            }
         ) {
             composable("dashboard") {
                 DashboardScreen(
@@ -164,14 +203,26 @@ fun FitcheckApp() {
                         navController.navigate("workout")
                     },
                     onStartTemplate = { template ->
-                        workoutViewModel.startWorkout(template.name, template.id)
+                        workoutViewModel.startWorkout(template.name)
                         navController.navigate("workout")
+                    },
+                    onConfigureSchedule = {
+                        navController.navigate("weekly_schedule")
                     },
                     viewModel = dashboardViewModel
                 )
             }
+            composable("weekly_schedule") {
+                WeeklyScheduleScreen(
+                    viewModel = dashboardViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable("analytics") {
-                AnalyticsScreen(viewModel = analyticsViewModel)
+                AnalyticsScreen(
+                    viewModel = analyticsViewModel,
+                    onViewHistory = { /* Tab handles this now */ }
+                )
             }
             composable("profile") {
                 ProfileScreen(viewModel = profileViewModel)
@@ -180,24 +231,28 @@ fun FitcheckApp() {
                 LibraryScreen(
                     viewModel = libraryViewModel,
                     onStartTemplate = { template ->
-                        workoutViewModel.startWorkout(template.name, template.id)
+                        workoutViewModel.startWorkout(template.name)
                         navController.navigate("workout")
                     },
                     onEditTemplate = { template ->
                         workoutViewModel.resumeWorkout(template.id)
                         navController.navigate("template_edit")
                     },
-                    onCreateNewTemplate = {
-                        libraryViewModel.createTemplate("NEW TEMPLATE") { id ->
-                            workoutViewModel.resumeWorkout(id)
-                            navController.navigate("template_edit")
-                        }
+                    onCreateTemplate = {
+                        workoutViewModel.startWorkout("New Routine")
+                        navController.navigate("template_edit")
+                    },
+                    onCreateExercise = {
+                        navController.navigate("create_exercise")
                     }
                 )
             }
-            composable("template_edit") {
-                TemplateEditScreen(
-                    viewModel = workoutViewModel,
+            composable("create_exercise") {
+                CreateCustomExerciseScreen(
+                    onSave = { exercise ->
+                        libraryViewModel.insertExercise(exercise)
+                        navController.popBackStack()
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -215,17 +270,47 @@ fun FitcheckApp() {
                 val exerciseDetailViewModel: ExerciseDetailViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
                             return ExerciseDetailViewModel(repository, SavedStateHandle(mapOf("id" to id))) as T
                         }
                     }
                 )
                 ExerciseDetailScreen(viewModel = exerciseDetailViewModel, onBack = { navController.popBackStack() })
             }
+            composable("template_edit") {
+                TemplateEditScreen(
+                    viewModel = workoutViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable("workout") {
                 WorkoutScreen(
-                    onFinish = { navController.popBackStack() },
+                    onFinish = { id -> 
+                        navController.navigate("session_summary/$id") {
+                            popUpTo("dashboard") { inclusive = false }
+                        }
+                    },
                     onCancel = { navController.popBackStack() },
                     viewModel = workoutViewModel
+                )
+            }
+            composable(
+                route = "session_summary/{sessionId}",
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
+                val sessionSummaryViewModel: SessionSummaryViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return SessionSummaryViewModel(repository, SavedStateHandle(mapOf("sessionId" to sessionId))) as T
+                        }
+                    }
+                )
+                SessionSummaryScreen(
+                    sessionId = sessionId,
+                    navController = navController,
+                    viewModel = sessionSummaryViewModel
                 )
             }
         }

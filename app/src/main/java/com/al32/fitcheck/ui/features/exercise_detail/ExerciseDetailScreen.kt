@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,10 +28,10 @@ fun ExerciseDetailScreen(viewModel: ExerciseDetailViewModel, onBack: () -> Unit)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(uiState.exercise?.name?.uppercase() ?: "EXERCISE DETAIL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black) },
+                title = { Text(uiState.exercise?.name?.uppercase() ?: "DETAIL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -50,7 +50,7 @@ fun ExerciseDetailContent(uiState: ExerciseDetailUiState, modifier: Modifier = M
         if (uiState.history.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    series(uiState.history.map { it.weight }.take(10).reversed())
+                    series(uiState.history.map { it.weight.toDouble() }.reversed())
                 }
             }
         }
@@ -63,10 +63,10 @@ fun ExerciseDetailContent(uiState: ExerciseDetailUiState, modifier: Modifier = M
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF111111))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("ESTIMATED 1RM PROGRESSION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("ESTIMATED 1RM PROGRESSION", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     Spacer(Modifier.height(16.dp))
                     CartesianChartHost(
                         chart = rememberCartesianChart(rememberLineCartesianLayer()),
@@ -87,7 +87,7 @@ fun ExerciseDetailContent(uiState: ExerciseDetailUiState, modifier: Modifier = M
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("${set.weight}kg x ${set.reps}", style = MaterialTheme.typography.bodyLarge)
-                Text("Performance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Performance", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             }
         }
     }

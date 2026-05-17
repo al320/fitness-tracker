@@ -1,7 +1,10 @@
 package com.al32.fitcheck.ui.features.workout
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -28,17 +32,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.SetEntity
-import com.al32.fitcheck.ui.theme.*
+import com.al32.fitcheck.data.local.entities.Exercise
+import com.al32.fitcheck.data.local.entities.ExerciseEntry
+import com.al32.fitcheck.data.local.entities.SetEntry
+import com.al32.fitcheck.ui.theme.EliteWhite
+import com.al32.fitcheck.ui.utils.formatElapsedTime
 import com.al32.fitcheck.ui.viewmodel.ExerciseWithSets
 import com.al32.fitcheck.ui.viewmodel.WorkoutUiState
 import com.al32.fitcheck.ui.viewmodel.WorkoutViewModel
 import java.util.Locale
+import androidx.navigation.NavController
 
 @Composable
 fun WorkoutScreen(
-    onFinish: () -> Unit,
+    onFinish: (String) -> Unit,
     onCancel: () -> Unit,
     viewModel: WorkoutViewModel
 ) {
@@ -50,7 +57,9 @@ fun WorkoutScreen(
         onFinish = {
             viewModel.finishWorkout()
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onFinish()
+            // Wait for session id to be available in state after finish? 
+            // Or just navigate to summary with the current id.
+            uiState.session?.id?.let { onFinish(it) }
         },
         onCancel = onCancel,
         onAddSet = viewModel::addSet,
@@ -60,7 +69,8 @@ fun WorkoutScreen(
         onSearch = viewModel::searchExercises,
         onSelect = viewModel::addExercise,
         onRemoveExercise = viewModel::removeExercise,
-        onSkipRest = viewModel::skipRestTimer
+        onAddRest = { viewModel.addRestTime(30) },
+        onSkipRest = { viewModel.skipRest() }
     )
 }
 
@@ -70,13 +80,14 @@ fun WorkoutContent(
     uiState: WorkoutUiState,
     onFinish: () -> Unit,
     onCancel: () -> Unit,
-    onAddSet: (Long) -> Unit,
-    onUpdateSet: (Long, Double, Int, Boolean) -> Unit,
+    onAddSet: (String) -> Unit,
+    onUpdateSet: (SetEntry) -> Unit,
     onOpenPicker: () -> Unit,
     onClosePicker: () -> Unit,
     onSearch: (String) -> Unit,
-    onSelect: (ExerciseEntity) -> Unit,
-    onRemoveExercise: (Long) -> Unit,
+    onSelect: (Exercise) -> Unit,
+    onRemoveExercise: (ExerciseEntry) -> Unit,
+    onAddRest: () -> Unit,
     onSkipRest: () -> Unit
 ) {
     val lazyListState = rememberLazyListState()
@@ -88,28 +99,51 @@ fun WorkoutContent(
                 onCancel = onCancel,
                 onFinish = onFinish
             )
+        },
+        bottomBar = {
+            if (uiState.restTimerSeconds > 0) {
+                BottomAppBar(
+                    containerColor = Color(0xFF1A1A1A),
+                    tonalElevation = 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Timer, contentDescription = null,
+                            tint = Color(0xFFFF851B), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Rest: ${formatRestTime(uiState.restTimerSeconds)}",
+                            color = Color.White, style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f))
+                        TextButton(onClick = onAddRest) {
+                            Text("+30s", color = Color(0xFFFF851B))
+                        }
+                        TextButton(onClick = onSkipRest) {
+                            Text("Skip", color = Color.Gray)
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
+            LazyColumn(state = lazyListState, modifier = Modifier.fillMaxSize()) {
                 item {
-                    WorkoutStatsRow(uiState)
+                    WorkoutStatsBar(uiState)
                 }
 
-                itemsIndexed(uiState.exercises, key = { _, item -> item.exercise.id }) { _, section ->
+                itemsIndexed(uiState.exercises, key = { _, item -> item.entry.id }) { _, section ->
                     WorkoutExerciseSection(
                         section = section,
-                        onAddSet = { onAddSet(section.exercise.id) },
+                        onAddSet = { onAddSet(section.entry.id) },
                         onUpdateSet = onUpdateSet,
-                        onRemove = { onRemoveExercise(section.exercise.id) }
+                        onRemove = { onRemoveExercise(section.entry) }
                     )
                 }
 
                 item {
-                    AddExerciseAction(onOpenPicker)
+                    AddExerciseButton(onOpenPicker)
                 }
 
                 item { Spacer(Modifier.height(100.dp)) }
@@ -117,10 +151,6 @@ fun WorkoutContent(
 
             if (uiState.isExercisePickerOpen) {
                 ExercisePickerSheet(onClosePicker, onSearch, uiState.searchResults, onSelect)
-            }
-
-            uiState.restTimerSeconds?.let {
-                RecoveryTimerBar(it, onSkipRest)
             }
         }
     }
@@ -134,37 +164,43 @@ fun WorkoutTopBar(timer: String, onCancel: () -> Unit, onFinish: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("SESSION", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
                 Spacer(Modifier.width(12.dp))
-                Text(timer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = EliteWhite)
+                Text(timer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
             }
         },
         navigationIcon = {
             IconButton(onClick = onCancel) { Icon(Icons.Default.Close, null, tint = Color.Gray) }
         },
         actions = {
-            TextButton(onClick = onFinish) {
-                Text("FINISH", fontWeight = FontWeight.Black, color = Color(0xFF00ACC1))
+            Button(
+                onClick = onFinish,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF851B)),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp).padding(end = 8.dp)
+            ) {
+                Text("FINISH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = AmoledBlack)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
     )
 }
 
 @Composable
-fun WorkoutStatsRow(uiState: WorkoutUiState) {
+fun WorkoutStatsBar(uiState: WorkoutUiState) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(20.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        StatItem("VOLUME", String.format(Locale.getDefault(), "%.0fkg", uiState.totalVolume))
-        StatItem("SETS", uiState.totalSets.toString())
+        StatPill("VOLUME", String.format(Locale.getDefault(), "%.0fkg", uiState.totalVolume))
+        StatPill("SETS", uiState.totalSetsCount.toString())
     }
 }
 
 @Composable
-fun StatItem(label: String, value: String) {
-    Column {
+fun StatPill(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Black)
+        Spacer(Modifier.width(6.dp))
+        Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
     }
 }
 
@@ -172,10 +208,11 @@ fun StatItem(label: String, value: String) {
 fun WorkoutExerciseSection(
     section: ExerciseWithSets,
     onAddSet: () -> Unit,
-    onUpdateSet: (Long, Double, Int, Boolean) -> Unit,
+    onUpdateSet: (SetEntry) -> Unit,
     onRemove: () -> Unit
 ) {
     val lastSet = section.previousPerformance.firstOrNull()
+    val maxPrevWeight = section.previousPerformance.maxOfOrNull { it.weight } ?: 0f
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -192,7 +229,6 @@ fun WorkoutExerciseSection(
             IconButton(onClick = onRemove) { Icon(Icons.Default.MoreVert, null, tint = Color.DarkGray) }
         }
 
-        // Table Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -205,11 +241,7 @@ fun WorkoutExerciseSection(
         }
 
         section.sets.forEachIndexed { index, set ->
-            WorkoutSetTableTile(
-                index = index + 1,
-                set = set,
-                onUpdate = { w, r, c -> onUpdateSet(set.id, w, r, c) }
-            )
+            WorkoutSetRow(index = index + 1, set = set, onUpdate = onUpdateSet, isPRAttempt = set.weight > maxPrevWeight)
         }
 
         TextButton(onClick = onAddSet, modifier = Modifier.padding(horizontal = 12.dp)) {
@@ -223,52 +255,53 @@ fun WorkoutExerciseSection(
 }
 
 @Composable
-fun WorkoutSetTableTile(index: Int, set: SetEntity, onUpdate: (Double, Int, Boolean) -> Unit) {
+fun WorkoutSetRow(index: Int, set: SetEntry, onUpdate: (SetEntry) -> Unit, isPRAttempt: Boolean) {
     val haptic = LocalHapticFeedback.current
-    var weightText by remember(set.id) { mutableStateOf(if (set.weight == 0.0) "" else set.weight.toString()) }
-    var repsText by remember(set.id) { mutableStateOf(if (set.reps == 0) "" else set.reps.toString()) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().height(52.dp)
-            .background(if (set.isCompleted) Color(0xFF00ACC1).copy(alpha = 0.1f) else Color.Transparent)
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(index.toString(), modifier = Modifier.width(32.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = if (set.isCompleted) Color(0xFF00ACC1) else Color.Gray)
-        
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Text("-", style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
-        }
-
-        TacticalInput(
-            value = weightText,
-            onValueChange = { weightText = it; it.toDoubleOrNull()?.let { w -> onUpdate(w, repsText.toIntOrNull() ?: 0, set.isCompleted) } },
-            modifier = Modifier.weight(1f)
-        )
-
-        TacticalInput(
-            value = repsText,
-            onValueChange = { repsText = it; it.toIntOrNull()?.let { r -> onUpdate(weightText.toDoubleOrNull() ?: 0.0, r, set.isCompleted) } },
-            modifier = Modifier.weight(1f)
-        )
-
-        IconButton(
-            onClick = {
-                val w = weightText.toDoubleOrNull() ?: 0.0
-                val r = repsText.toIntOrNull() ?: 0
-                if (!set.isCompleted) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onUpdate(w, r, !set.isCompleted)
-            },
-            modifier = Modifier.size(44.dp).background(if (set.isCompleted) Color(0xFF00ACC1) else Gunmetal, RoundedCornerShape(4.dp))
+    val rowColor by animateColorAsState(
+        targetValue = if (set.isCompleted) Color(0xFF1A3A1A) else Color.Transparent,
+        animationSpec = tween(250), label = "rowColor"
+    )
+    val checkScale by animateFloatAsState(
+        targetValue = if (set.isCompleted) 1.1f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "checkScale"
+    )
+    
+    Column(modifier = Modifier.fillMaxWidth().background(rowColor)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(52.dp)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Default.Check, null, tint = if (set.isCompleted) Color.Black else Color.DarkGray, modifier = Modifier.size(20.dp))
+            Text(index.toString(), modifier = Modifier.width(32.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = if (set.isCompleted) Color.Green else Color.Gray)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Text("-", style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
+            }
+            SetInputBox(value = if (set.weight == 0f) "" else set.weight.toString(), onValueChange = { val w = it.toFloatOrNull() ?: 0f; onUpdate(set.copy(weight = w)) }, modifier = Modifier.weight(1f))
+            SetInputBox(value = if (set.reps == 0) "" else set.reps.toString(), onValueChange = { val r = it.toIntOrNull() ?: 0; onUpdate(set.copy(reps = r)) }, modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = {
+                    if (!set.isCompleted) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onUpdate(set.copy(isCompleted = !set.isCompleted, completedAt = System.currentTimeMillis()))
+                },
+                modifier = Modifier.size(44.dp).graphicsLayer(scaleX = checkScale, scaleY = checkScale).background(if (set.isCompleted) Color.Green else Color.DarkGray.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            ) {
+                Icon(Icons.Default.Check, null, tint = if (set.isCompleted) Color.Black else Color.DarkGray, modifier = Modifier.size(20.dp))
+            }
+        }
+        if (isPRAttempt && !set.isCompleted) {
+            Text("🏆 PR ATTEMPT",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFF6D00),
+                modifier = Modifier.padding(start = 60.dp, bottom = 4.dp),
+                fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun TacticalInput(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SetInputBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -276,18 +309,13 @@ fun TacticalInput(value: String, onValueChange: (String) -> Unit, modifier: Modi
         textStyle = TextStyle(color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp, textAlign = TextAlign.Center),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
         singleLine = true,
-        cursorBrush = SolidColor(EliteWhite)
+        cursorBrush = SolidColor(Color.White)
     )
 }
 
 @Composable
-fun AddExerciseAction(onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(20.dp).height(52.dp),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(0.5.dp, Color.DarkGray)
-    ) {
+fun AddExerciseButton(onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(20.dp).height(52.dp), shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)) {
         Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text("ADD EXERCISE", style = MaterialTheme.typography.labelLarge)
@@ -296,40 +324,21 @@ fun AddExerciseAction(onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExercisePickerSheet(onDismiss: () -> Unit, onSearch: (String) -> Unit, results: List<ExerciseEntity>, onSelect: (ExerciseEntity) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Onyx, dragHandle = null) {
+fun ExercisePickerSheet(onDismiss: () -> Unit, onSearch: (String) -> Unit, results: List<Exercise>, onSelect: (Exercise) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF0D0D0D), dragHandle = null) {
         Column(modifier = Modifier.fillMaxHeight(0.85f).padding(16.dp)) {
             var query by remember { mutableStateOf("") }
-            TextField(value = query, onValueChange = { query = it; onSearch(it) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search Movements...") }, colors = TextFieldDefaults.colors(focusedContainerColor = Gunmetal, unfocusedContainerColor = Gunmetal))
+            TextField(value = query, onValueChange = { query = it; onSearch(it) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search Exercises") }, colors = TextFieldDefaults.colors(focusedContainerColor = Color.DarkGray.copy(alpha = 0.2f), unfocusedContainerColor = Color.DarkGray.copy(alpha = 0.2f)))
             Spacer(Modifier.height(16.dp))
             LazyColumn {
                 itemsIndexed(results) { _, exercise ->
-                    ListItem(headlineContent = { Text(exercise.name.uppercase(), fontWeight = FontWeight.Bold) }, supportingContent = { Text(exercise.muscleGroup) }, modifier = Modifier.clickable { onSelect(exercise) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+                    ListItem(headlineContent = { Text(exercise.name.uppercase(), fontWeight = FontWeight.Bold) }, supportingContent = { Text(exercise.movementPattern.name) }, modifier = Modifier.clickable { onSelect(exercise) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                 }
             }
         }
     }
 }
 
-@Composable
-fun RecoveryTimerBar(seconds: Int, onSkip: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize().padding(bottom = 20.dp), contentAlignment = Alignment.BottomCenter) {
-        Surface(color = Onyx, border = BorderStroke(1.dp, Color(0xFF00ACC1).copy(alpha = 0.4f)), shape = RoundedCornerShape(8.dp)) {
-            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Timer, null, tint = Color(0xFF00ACC1), modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(String.format(Locale.getDefault(), "RECOVERY: %02d:%02d", seconds / 60, seconds % 60), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black)
-                Spacer(Modifier.width(16.dp))
-                Text("SKIP", modifier = Modifier.clickable(onClick = onSkip), color = Color(0xFF00ACC1), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black)
-            }
-        }
-    }
-}
-
-fun formatElapsedTime(seconds: Long): String {
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    return if (h > 0) String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
-    else String.format(Locale.getDefault(), "%02d:%02d", m, s)
+private fun formatRestTime(seconds: Int): String {
+    return String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60)
 }

@@ -1,136 +1,157 @@
 package com.al32.fitcheck.data.repository
 
-import com.al32.fitcheck.data.local.BackupData
-import com.al32.fitcheck.data.local.dao.ExerciseDao
-import com.al32.fitcheck.data.local.dao.MuscleIntensity
-import com.al32.fitcheck.data.local.dao.SetDao
-import com.al32.fitcheck.data.local.dao.UserStatsDao
-import com.al32.fitcheck.data.local.dao.VolumeHistory
-import com.al32.fitcheck.data.local.dao.WorkoutDao
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.SetEntity
-import com.al32.fitcheck.data.local.entities.UserStatsEntity
-import com.al32.fitcheck.data.local.entities.WorkoutEntity
-import com.al32.fitcheck.data.local.entities.WorkoutExerciseEntity
+import androidx.room.withTransaction
+import com.al32.fitcheck.data.local.AppDatabase
+import com.al32.fitcheck.data.local.dao.*
+import com.al32.fitcheck.data.local.entities.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import java.util.UUID
 
 class FitcheckRepository(
+    private val database: AppDatabase,
     private val workoutDao: WorkoutDao,
     private val exerciseDao: ExerciseDao,
     private val setDao: SetDao,
-    private val userStatsDao: UserStatsDao
+    private val templateDao: TemplateDao,
+    private val prDao: PRDao,
+    private val weeklyScheduleDao: WeeklyScheduleDao
 ) {
-    // Workout functions
-    val allWorkouts: Flow<List<WorkoutEntity>> = workoutDao.getAllWorkouts()
-    val templates: Flow<List<WorkoutEntity>> = workoutDao.getTemplates()
-    val activeWorkout: Flow<WorkoutEntity?> = workoutDao.getActiveWorkout()
-    
-    suspend fun startWorkout(name: String, isTemplate: Boolean = false): Long {
-        return workoutDao.insertWorkout(
-            WorkoutEntity(name = name, startTime = System.currentTimeMillis(), isTemplate = isTemplate)
-        )
+    // Session flows
+    val allSessions: Flow<List<WorkoutSession>> = workoutDao.getAllSessions()
+    val activeSession: Flow<WorkoutSession?> = workoutDao.getActiveSession()
+    val templates: Flow<List<WorkoutTemplate>> = templateDao.getAllTemplates()
+    val weeklySchedule: Flow<List<WeeklyScheduleDay>> = weeklyScheduleDao.getAllScheduleDays()
+
+    suspend fun upsertScheduleDay(day: WeeklyScheduleDay) {
+        weeklyScheduleDao.upsertScheduleDay(day)
     }
 
-    suspend fun saveAsTemplate(workoutId: Long, name: String) {
-        val workout = workoutDao.getWorkoutById(workoutId) ?: return
-        val newTemplateId = startWorkout(name, isTemplate = true)
-        // Copy exercises would go here (requires join table copy)
+    suspend fun createSession(name: String): String {
+        val id = UUID.randomUUID().toString()
+        workoutDao.insertSession(WorkoutSession(id, System.currentTimeMillis(), null, name))
+        return id
     }
 
-    suspend fun reorderExercise(workoutId: Long, exerciseId: Long, newOrder: Int) {
-        workoutDao.updateExerciseOrder(workoutId, exerciseId, newOrder)
-    }
-
-    suspend fun removeExerciseFromWorkout(workoutId: Long, exerciseId: Long) {
-        workoutDao.removeExerciseFromWorkout(workoutId, exerciseId)
-    }
-
-    fun getExercisesForWorkout(workoutId: Long): Flow<List<ExerciseEntity>> = 
-        workoutDao.getExercisesForWorkout(workoutId)
-
-    suspend fun addExerciseToWorkout(workoutId: Long, exerciseId: Long, order: Int) {
-        workoutDao.insertWorkoutExercise(WorkoutExerciseEntity(workoutId = workoutId, exerciseId = exerciseId, order = order))
-    }
-
-    suspend fun updateSet(setId: Long, reps: Int, weight: Double, isPr: Boolean, isCompleted: Boolean) {
-        setDao.updateSetData(setId, reps, weight, isPr, isCompleted)
-    }
-
-    suspend fun getPersonalRecord(exerciseId: Long): SetEntity? = setDao.getPersonalRecord(exerciseId)
-
-    suspend fun getPreviousPerformance(exerciseId: Long, workoutId: Long): List<SetEntity> = 
-        setDao.getPreviousPerformance(exerciseId, workoutId)
-
-    fun searchExercises(query: String): Flow<List<ExerciseEntity>> =
-        exerciseDao.searchExercises(query)
-
-    suspend fun duplicateTemplate(templateId: Long) {
-        val original = workoutDao.getWorkoutById(templateId) ?: return
-        val newId = startWorkout(original.name + " (COPY)", isTemplate = true)
-        val entries = workoutDao.getWorkoutExerciseEntriesSync(templateId)
-        entries.forEach { entry ->
-            workoutDao.insertWorkoutExercise(entry.copy(id = 0, workoutId = newId))
+    suspend fun completeWorkout(
+        session: WorkoutSession,
+        exerciseEntries: List<ExerciseEntry>,
+        setEntries: List<SetEntry>
+    ) {
+        database.withTransaction {
+            workoutDao.upsertSession(session.copy(
+                endTime = System.currentTimeMillis(),
+                isCompleted = true
+            ))
+            exerciseEntries.forEach { workoutDao.insertEntry(it) }
+            setEntries.filter { it.isCompleted }.forEach { setDao.insertSet(it) }
         }
+        detectNewPRs(session.id)
     }
 
-    suspend fun updateTemplateName(id: Long, name: String) {
-        workoutDao.updateWorkoutName(id, name)
+    // Exercise Entries
+    fun getEntriesForSession(sessionId: String): Flow<List<ExerciseEntry>> = workoutDao.getEntriesForSession(sessionId)
+
+    suspend fun addExerciseToSession(sessionId: String, exerciseId: String, order: Int) {
+        val id = UUID.randomUUID().toString()
+        workoutDao.insertEntry(ExerciseEntry(id, sessionId, exerciseId, order))
     }
 
-    suspend fun deleteWorkout(workout: WorkoutEntity) {
-        workoutDao.deleteWorkout(workout)
+    suspend fun deleteEntry(entry: ExerciseEntry) = workoutDao.deleteEntry(entry)
+
+    suspend fun getEntriesForSessionSync(sessionId: String) = workoutDao.getEntriesForSessionSync(sessionId).first()
+
+    // Sets
+    fun getSetsForEntry(entryId: String): Flow<List<SetEntry>> = setDao.getSetsForEntry(entryId)
+
+    suspend fun addSetToEntry(entryId: String) {
+        val id = UUID.randomUUID().toString()
+        setDao.insertSet(SetEntry(id, entryId, 0f, 0, System.currentTimeMillis(), false))
     }
 
-    suspend fun deleteSet(setId: Long) {
-        // We need a delete by ID or the entity. For simplicity adding deleteSetById if needed or just using entity.
-        // Let's assume we have the entity or add it to Dao.
-    }
+    suspend fun updateSet(set: SetEntry) = setDao.updateSet(set)
 
-    suspend fun finishWorkout(workoutId: Long, xp: Int) {
-        workoutDao.finishWorkout(workoutId, System.currentTimeMillis(), xp)
-        userStatsDao.addXp(xp)
-    }
+    suspend fun deleteSet(set: SetEntry) = setDao.deleteSet(set)
 
-    // Exercise functions
-    val allExercises: Flow<List<ExerciseEntity>> = exerciseDao.getAllExercises()
+    // Templates
+    fun getExercisesForTemplate(templateId: String): Flow<List<TemplateExercise>> = templateDao.getExercisesForTemplate(templateId)
+    
+    suspend fun upsertTemplate(template: WorkoutTemplate) = templateDao.upsertTemplate(template)
+    
+    suspend fun upsertTemplateExercise(exercise: TemplateExercise) = templateDao.upsertTemplateExercise(exercise)
+    
+    suspend fun deleteTemplate(template: WorkoutTemplate) = templateDao.deleteTemplate(template)
+
+    // Exercise Library
+    val allExercises: Flow<List<Exercise>> = exerciseDao.getAllExercises()
     
     suspend fun getExerciseCount(): Int = exerciseDao.getExerciseCount()
     
-    suspend fun insertExercises(exercises: List<ExerciseEntity>) = exerciseDao.insertExercises(exercises)
+    suspend fun insertExercises(exercises: List<Exercise>) = exerciseDao.insertExercises(exercises)
 
-    // Set functions
-    fun getSetsForWorkout(workoutId: Long): Flow<List<SetEntity>> = setDao.getSetsForWorkout(workoutId)
-    
-    fun getHistoryForExercise(exerciseId: Long): Flow<List<SetEntity>> = setDao.getHistoryForExercise(exerciseId)
+    suspend fun getExerciseById(id: String): Exercise? = exerciseDao.getExerciseById(id)
 
-    fun getAllCompletedSets(): Flow<List<SetEntity>> = setDao.getAllCompletedSets()
+    fun getHistoryForExercise(exerciseId: String): Flow<List<SetEntry>> = setDao.getHistoryForExercise(exerciseId)
 
-    suspend fun addSet(set: SetEntity) = setDao.insertSet(set)
+    suspend fun getPersonalRecord(exerciseId: String): SetEntry? = setDao.getPersonalRecord(exerciseId)
 
-    // User stats
-    val userStats: Flow<UserStatsEntity?> = userStatsDao.getUserStats()
-    val totalVolume: Flow<Double?> = setDao.getTotalVolume()
-    val dailyVolumeHistory: Flow<List<VolumeHistory>> = setDao.getDailyVolumeHistory()
-    
-    fun getMuscleIntensity(since: Long): Flow<List<MuscleIntensity>> = 
-        setDao.getMuscleIntensity(since)
+    fun getSetsForSession(sessionId: String): Flow<List<SetEntry>> = setDao.getSetsForSession(sessionId)
 
-    suspend fun getBackupData(): BackupData {
-        return BackupData(
-            workouts = workoutDao.getAllWorkoutsSync(),
-            sets = setDao.getAllSetsSync(),
-            exercises = exerciseDao.getAllExercisesSync(),
-            workoutExercises = workoutDao.getAllWorkoutExercisesSync(),
-            userStats = userStatsDao.getUserStatsSync()
-        )
-    }
+    fun getPRsForSession(sessionId: String): Flow<List<PersonalRecord>> = prDao.getPRsForSession(sessionId)
 
-    suspend fun restoreBackup(data: BackupData) {
-        workoutDao.insertWorkouts(data.workouts)
-        setDao.insertSets(data.sets)
-        exerciseDao.insertExercises(data.exercises)
-        workoutDao.insertWorkoutExercises(data.workoutExercises)
-        data.userStats?.let { userStatsDao.insertOrUpdateStats(it) }
+    // Analytics Helper
+    fun getCompletedSetsWithPhysiology(since: Long): Flow<List<SetWithPhysiology>> = setDao.getCompletedSetsWithPhysiology(since)
+
+    fun getPreviousPerformance(exerciseId: String, currentSessionId: String): Flow<List<SetEntry>> = 
+        setDao.getPreviousPerformance(exerciseId, currentSessionId)
+
+    fun getBestE1RMPerExercise(since: Long): Flow<List<ExerciseBest1RM>> = setDao.getBestE1RMPerExercise(since)
+
+    suspend fun detectNewPRs(sessionId: String): List<PersonalRecord> {
+        val newPRs = mutableListOf<PersonalRecord>()
+        val sessionSets = setDao.getSetsForSession(sessionId).first().filter { it.isCompleted }
+        val entries = workoutDao.getEntriesForSessionSync(sessionId).first()
+
+        for (set in sessionSets) {
+            val entry = entries.find { it.id == set.exerciseEntryId } ?: continue
+            val exerciseId = entry.exerciseId
+            
+            // This is slightly inefficient but matches the requested logic
+            val allPrev = setDao.getSetsForExercise(exerciseId).first()
+                .filter { it.isCompleted && it.completedAt < set.completedAt }
+
+            // Weight PR
+            val maxPrevWeight = allPrev.maxOfOrNull { it.weight } ?: 0f
+            if (set.weight > maxPrevWeight) {
+                newPRs.add(PersonalRecord(
+                    exerciseId = exerciseId,
+                    type = PRType.WEIGHT,
+                    value = set.weight,
+                    achievedAt = set.completedAt,
+                    sessionId = sessionId
+                ))
+            }
+
+            // Volume PR (weight × reps)
+            val thisVolume = set.weight * set.reps
+            val maxPrevVolume = allPrev.maxOfOrNull { it.weight * it.reps } ?: 0f
+            if (thisVolume > maxPrevVolume) {
+                newPRs.add(PersonalRecord(
+                    exerciseId = exerciseId,
+                    type = PRType.VOLUME,
+                    value = thisVolume,
+                    achievedAt = set.completedAt,
+                    sessionId = sessionId
+                ))
+            }
+        }
+
+        // Deduplicate: keep highest value per exercise per type
+        val deduped = newPRs
+            .groupBy { it.exerciseId to it.type }
+            .map { (_, prs) -> prs.maxBy { it.value } }
+
+        deduped.forEach { prDao.upsertPR(it) }
+        return deduped
     }
 }

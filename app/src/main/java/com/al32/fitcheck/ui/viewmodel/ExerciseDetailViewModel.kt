@@ -3,15 +3,15 @@ package com.al32.fitcheck.ui.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.SetEntity
+import com.al32.fitcheck.data.local.entities.Exercise
+import com.al32.fitcheck.data.local.entities.SetEntry
 import com.al32.fitcheck.data.repository.FitcheckRepository
 import kotlinx.coroutines.flow.*
 
 data class ExerciseDetailUiState(
-    val exercise: ExerciseEntity? = null,
-    val history: List<SetEntity> = emptyList(),
-    val personalRecord: SetEntity? = null
+    val exercise: Exercise? = null,
+    val history: List<SetEntry> = emptyList(),
+    val personalRecord: SetEntry? = null
 )
 
 class ExerciseDetailViewModel(
@@ -19,7 +19,7 @@ class ExerciseDetailViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val exerciseId: Long = checkNotNull(savedStateHandle["id"])
+    private val exerciseId: String = checkNotNull(savedStateHandle.get<Long>("id")).toString()
 
     private val _uiState = MutableStateFlow(ExerciseDetailUiState())
     val uiState: StateFlow<ExerciseDetailUiState> = _uiState.asStateFlow()
@@ -40,7 +40,6 @@ class ExerciseDetailViewModel(
                 _uiState.update { it.copy(history = history) }
             }.launchIn(viewModelScope)
             
-        // Load real PR
         flow {
             emit(repository.getPersonalRecord(exerciseId))
         }.onEach { pr ->

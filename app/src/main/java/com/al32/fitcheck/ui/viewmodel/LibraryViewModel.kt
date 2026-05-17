@@ -3,13 +3,13 @@ package com.al32.fitcheck.ui.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.al32.fitcheck.data.local.entities.WorkoutEntity
+import com.al32.fitcheck.data.local.entities.WorkoutTemplate
 import com.al32.fitcheck.data.repository.FitcheckRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class LibraryUiState(
-    val templates: List<WorkoutEntity> = emptyList()
+    val templates: List<WorkoutTemplate> = emptyList()
 )
 
 class LibraryViewModel(
@@ -28,22 +28,21 @@ class LibraryViewModel(
             .launchIn(viewModelScope)
     }
 
-    fun deleteTemplate(template: WorkoutEntity) {
+    fun deleteTemplate(template: WorkoutTemplate) {
         viewModelScope.launch {
-            repository.deleteWorkout(template)
+            repository.deleteTemplate(template)
         }
     }
 
-    fun duplicateTemplate(template: WorkoutEntity) {
+    fun upsertTemplate(template: WorkoutTemplate) {
         viewModelScope.launch {
-            repository.duplicateTemplate(template.id)
+            repository.upsertTemplate(template)
         }
     }
 
-    fun createTemplate(name: String, onComplete: (Long) -> Unit) {
+    fun insertExercise(exercise: com.al32.fitcheck.data.local.entities.Exercise) {
         viewModelScope.launch {
-            val id = repository.startWorkout(name, isTemplate = true)
-            onComplete(id)
+            repository.insertExercises(listOf(exercise))
         }
     }
 }

@@ -11,53 +11,43 @@ import java.io.IOException
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
-data class UserPreferences(
-    val weightUnit: String = "KG",
-    val hapticEnabled: Boolean = true,
-    val defaultRestSeconds: Int = 90,
-    val themeIntensity: Float = 1.0f
+enum class ExperienceLevel { BEGINNER, INTERMEDIATE, ADVANCED }
+
+data class UserProfile(
+    val name: String = "",
+    val bodyweightKg: Float = 0f,
+    val experienceLevel: ExperienceLevel = ExperienceLevel.BEGINNER
 )
 
 class UserPreferencesRepository(private val context: Context) {
     private object PreferencesKeys {
+        val NAME = stringPreferencesKey("user_name")
+        val BODYWEIGHT = floatPreferencesKey("bodyweight")
+        val EXPERIENCE = stringPreferencesKey("experience")
         val WEIGHT_UNIT = stringPreferencesKey("weight_unit")
         val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
-        val DEFAULT_REST_SECONDS = intPreferencesKey("default_rest_seconds")
-        val THEME_INTENSITY = floatPreferencesKey("theme_intensity")
     }
 
-    val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
+    val userProfileFlow: Flow<UserProfile> = context.dataStore.data
         .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
+            if (exception is IOException) emit(emptyPreferences())
+            else throw exception
         }
         .map { preferences ->
-            UserPreferences(
-                weightUnit = preferences[PreferencesKeys.WEIGHT_UNIT] ?: "KG",
-                hapticEnabled = preferences[PreferencesKeys.HAPTIC_ENABLED] ?: true,
-                defaultRestSeconds = preferences[PreferencesKeys.DEFAULT_REST_SECONDS] ?: 90,
-                themeIntensity = preferences[PreferencesKeys.THEME_INTENSITY] ?: 1.0f
+            UserProfile(
+                name = preferences[PreferencesKeys.NAME] ?: "",
+                bodyweightKg = preferences[PreferencesKeys.BODYWEIGHT] ?: 0f,
+                experienceLevel = ExperienceLevel.valueOf(
+                    preferences[PreferencesKeys.EXPERIENCE] ?: ExperienceLevel.BEGINNER.name
+                )
             )
         }
 
-    suspend fun updateWeightUnit(unit: String) {
+    suspend fun updateProfile(profile: UserProfile) {
         context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.WEIGHT_UNIT] = unit
-        }
-    }
-
-    suspend fun updateHapticEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.HAPTIC_ENABLED] = enabled
-        }
-    }
-
-    suspend fun updateDefaultRestSeconds(seconds: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DEFAULT_REST_SECONDS] = seconds
+            preferences[PreferencesKeys.NAME] = profile.name
+            preferences[PreferencesKeys.BODYWEIGHT] = profile.bodyweightKg
+            preferences[PreferencesKeys.EXPERIENCE] = profile.experienceLevel.name
         }
     }
 }

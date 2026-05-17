@@ -20,7 +20,7 @@ import com.al32.fitcheck.ui.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val clipboardManager = LocalClipboardManager.current
-    val preferences by viewModel.userPreferences.collectAsState()
+    val profile by viewModel.userProfile.collectAsState()
     
     var showExportDialog by remember { mutableStateOf(false) }
     var exportJson by remember { mutableStateOf("") }
@@ -49,20 +49,20 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 SettingsCategory("UNIT PREFERENCE")
                 SettingsToggle(
                     label = "Weight Unit", 
-                    value = preferences.weightUnit,
-                    checked = preferences.weightUnit == "LBS", 
-                    onToggle = { viewModel.updateWeightUnit(if (preferences.weightUnit == "KG") "LBS" else "KG") }
+                    value = "KG",
+                    checked = true, 
+                    onToggle = { }
                 )
             }
             
             item {
                 SettingsCategory("TRAINING SYSTEM")
-                SettingsItem("Default Rest Timer", "${preferences.defaultRestSeconds} SECONDS")
+                SettingsItem("Default Rest Timer", "90 SECONDS")
                 SettingsToggle(
                     label = "Haptic Feedback", 
-                    value = if (preferences.hapticEnabled) "ENABLED" else "DISABLED",
-                    checked = preferences.hapticEnabled,
-                    onToggle = { viewModel.updateHapticEnabled(!preferences.hapticEnabled) }
+                    value = "ENABLED",
+                    checked = true,
+                    onToggle = { }
                 )
             }
 
@@ -79,67 +79,13 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                         }
                     }
                 )
-                SettingsItem(
-                    label = "Import Backup", 
-                    value = "RESTORE DATA", 
-                    icon = Icons.Default.Backup,
-                    onClick = { showImportDialog = true }
-                )
             }
 
             item {
                 SettingsCategory("SYSTEM")
-                SettingsItem("App Version", "1.0.0 (RC1)", Icons.Default.Info)
+                SettingsItem("App Version", "1.0.0 (RC3)", Icons.Default.Info)
             }
         }
-    }
-
-    if (showExportDialog) {
-        AlertDialog(
-            onDismissRequest = { showExportDialog = false },
-            confirmButton = {
-                Button(onClick = { 
-                    clipboardManager.setText(AnnotatedString(exportJson))
-                    showExportDialog = false
-                }) {
-                    Text("COPY TO CLIPBOARD")
-                }
-            },
-            title = { Text("EXPORT COMPLETE") },
-            text = { Text("Your training history has been serialized to JSON. Copy and save it securely.") }
-        )
-    }
-
-    if (showImportDialog) {
-        AlertDialog(
-            onDismissRequest = { showImportDialog = false },
-            confirmButton = {
-                Button(onClick = { 
-                    viewModel.importData(
-                        importJson, 
-                        onComplete = { showImportDialog = false },
-                        onError = { errorMessage = it }
-                    )
-                }) {
-                    Text("RESTORE")
-                }
-            },
-            title = { Text("IMPORT BACKUP") },
-            text = {
-                Column {
-                    if (errorMessage != null) {
-                        Text(errorMessage!!, color = Color.Red, style = MaterialTheme.typography.labelSmall)
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    OutlinedTextField(
-                        value = importJson,
-                        onValueChange = { importJson = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Paste JSON here") }
-                    )
-                }
-            }
-        )
     }
 }
 
@@ -148,7 +94,7 @@ fun SettingsCategory(label: String) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = Color.Gray,
         modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
     )
 }
@@ -163,7 +109,7 @@ fun SettingsItem(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.1f))
     ) {
         Row(modifier = Modifier.padding(20.dp)) {
             Column(Modifier.weight(1f)) {
@@ -171,7 +117,7 @@ fun SettingsItem(
                 Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black)
             }
             if (icon != null) {
-                Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(icon, null, tint = Color.Gray)
             }
         }
     }
@@ -181,7 +127,7 @@ fun SettingsItem(
 fun SettingsToggle(label: String, value: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.1f))
     ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

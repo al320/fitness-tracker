@@ -3,39 +3,36 @@ package com.al32.fitcheck.ui.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.SetEntity
+import com.al32.fitcheck.data.local.entities.*
 import com.al32.fitcheck.data.repository.FitcheckRepository
-import com.al32.fitcheck.domain.physiology.PhysiologyProvider
-import com.al32.fitcheck.domain.scoring.StrengthScorer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.util.UUID
 
 data class WorkoutUiState(
-    val workoutId: Long? = null,
+    val session: WorkoutSession? = null,
     val exercises: List<ExerciseWithSets> = emptyList(),
     val elapsedTime: Long = 0,
-    val totalVolume: Double = 0.0,
-    val completedSets: Int = 0,
-    val totalSets: Int = 0,
+    val totalVolume: Float = 0f,
+    val completedSetsCount: Int = 0,
+    val totalSetsCount: Int = 0,
     val isExercisePickerOpen: Boolean = false,
-    val searchResults: List<ExerciseEntity> = emptyList(),
-    val recentPr: SetEntity? = null,
-    val restTimerSeconds: Int? = null,
+    val searchResults: List<Exercise> = emptyList(),
+    val restTimerSeconds: Int = 0,
     val summary: WorkoutSummary? = null
 )
 
 data class WorkoutSummary(
-    val totalVolume: Double,
-    val totalSets: Int,
     val durationSeconds: Long,
-    val prCount: Int
+    val totalVolume: Float,
+    val setsCompleted: Int
 )
 
 data class ExerciseWithSets(
-    val exercise: ExerciseEntity,
-    val sets: List<SetEntity>,
-    val previousPerformance: List<SetEntity> = emptyList()
+    val entry: ExerciseEntry,
+    val exercise: Exercise,
+    val sets: List<SetEntry>,
+    val previousPerformance: List<SetEntry> = emptyList()
 )
 
 class WorkoutViewModel(
@@ -43,220 +40,227 @@ class WorkoutViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(WorkoutUiState())
-    val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
+    private val KEY_SESSION_ID = "session_id"
+    private val sessionIdFlow = savedStateHandle.getStateFlow<String?>(KEY_SESSION_ID, null)
+
+    private val _isExercisePickerOpen = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
+    private val _elapsedTime = MutableStateFlow(0L)
+    private val _restTimerSeconds = MutableStateFlow(0)
+    private val _summary = MutableStateFlow<WorkoutSummary?>(null)
 
     private var timerJob: Job? = null
-    private var searchJob: Job? = null
     private var restTimerJob: Job? = null
 
-    companion object {
-        private const val KEY_WORKOUT_ID = "workout_id"
-        private const val KEY_ELAPSED_TIME = "elapsed_time"
-        private const val KEY_IS_PICKER_OPEN = "is_picker_open"
-    }
-
-    init {
-        val restoredId = savedStateHandle.get<Long>(KEY_WORKOUT_ID)
-        val restoredTime = savedStateHandle.get<Long>(KEY_ELAPSED_TIME) ?: 0L
-        val restoredPicker = savedStateHandle.get<Boolean>(KEY_IS_PICKER_OPEN) ?: false
-
-        _uiState.update { it.copy(
-            workoutId = restoredId,
-            elapsedTime = restoredTime,
-            isExercisePickerOpen = restoredPicker
-        ) }
-
-        if (restoredId != null) startTimer(restoredTime)
-        initWorkoutObserver()
-    }
-
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun initWorkoutObserver() {
-        _uiState
-            .map { it.workoutId }
-            .distinctUntilChanged()
-            .filterNotNull()
-            .flatMapLatest { workoutId ->
-                combine(
-                    repository.getExercisesForWorkout(workoutId),
-                    repository.getSetsForWorkout(workoutId)
-                ) { exercises, sets ->
-                    exercises.map { exercise ->
-                        ExerciseWithSets(
-                            exercise = exercise,
-                            sets = sets.filter { it.exerciseId == exercise.id },
-                            previousPerformance = repository.getPreviousPerformance(exercise.id, workoutId)
-                        )
+    private val exercisesWithSetsFlow: Flow<List<ExerciseWithSets>> = sessionIdFlow
+        .flatMapLatest { sessionId ->
+            if (sessionId == null) flowOf(emptyList())
+            else {
+                repository.getEntriesForSession(sessionId).flatMapLatest { entries ->
+                    if (entries.isEmpty()) flowOf(emptyList())
+                    else {
+                        val flows = entries.map { entry ->
+                            combine(
+                                flow { emit(repository.getExerciseById(entry.exerciseId)) },
+                                repository.getSetsForEntry(entry.id),
+                                repository.getPreviousPerformance(entry.exerciseId, sessionId)
+                            ) { exercise, sets, prev ->
+                                ExerciseWithSets(entry, exercise!!, sets, prev)
+                            }
+                        }
+                        combine(flows) { it.toList() }
                     }
                 }
             }
-            .onEach { exercisesWithSets ->
-                val totalVolume = exercisesWithSets.sumOf { it.sets.filter { s -> s.isCompleted }.sumOf { set -> set.weight * set.reps } }
-                val totalSets = exercisesWithSets.sumOf { it.sets.size }
-                val completedSets = exercisesWithSets.sumOf { it.sets.count { s -> s.isCompleted } }
-                
-                _uiState.update { it.copy(
-                    exercises = exercisesWithSets,
-                    totalVolume = totalVolume,
-                    totalSets = totalSets,
-                    completedSets = completedSets
-                ) }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val searchResultsFlow: Flow<List<Exercise>> = _searchQuery
+        .flatMapLatest { query ->
+            repository.allExercises.map { list ->
+                list.filter { it.name.contains(query, ignoreCase = true) }
             }
-            .launchIn(viewModelScope)
+        }
+
+    val uiState: StateFlow<WorkoutUiState> = combine(
+        sessionIdFlow,
+        repository.activeSession,
+        exercisesWithSetsFlow,
+        combine(_elapsedTime, _isExercisePickerOpen, searchResultsFlow, _restTimerSeconds, _summary) { args ->
+            args
+        }
+    ) { sessionId, activeSession, exercises, other ->
+        val elapsed = other[0] as Long
+        val pickerOpen = other[1] as Boolean
+        val searchResults = other[2] as List<Exercise>
+        val restTimer = other[3] as Int
+        val summary = other[4] as WorkoutSummary?
+
+        val session = if (sessionId != null && activeSession?.id == sessionId) activeSession else null
+        
+        val totalVol = exercises.sumOf { e -> 
+            e.sets.filter { it.isCompleted }.sumOf { s -> (s.weight * s.reps).toDouble() } 
+        }.toFloat()
+        val totalSets = exercises.sumOf { it.sets.size }
+        val completed = exercises.sumOf { it.sets.count { it.isCompleted } }
+
+        WorkoutUiState(
+            session = session,
+            exercises = exercises,
+            elapsedTime = elapsed,
+            totalVolume = totalVol,
+            completedSetsCount = completed,
+            totalSetsCount = totalSets,
+            isExercisePickerOpen = pickerOpen,
+            searchResults = searchResults,
+            restTimerSeconds = restTimer,
+            summary = summary
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = WorkoutUiState()
+    )
+
+    init {
+        sessionIdFlow.onEach { id ->
+            if (id != null) startTimer()
+            else stopTimer()
+        }.launchIn(viewModelScope)
     }
 
-    fun startWorkout(name: String, templateId: Long? = null) {
+    fun startWorkout(name: String) {
         viewModelScope.launch {
-            val id = repository.startWorkout(name)
-            savedStateHandle[KEY_WORKOUT_ID] = id
-            _uiState.update { it.copy(workoutId = id) }
-            startTimer(0)
-            
-            if (templateId != null) {
-                repository.getExercisesForWorkout(templateId).first().forEachIndexed { index, exercise ->
-                    repository.addExerciseToWorkout(id, exercise.id, index)
-                }
-            }
+            val id = repository.createSession(name)
+            savedStateHandle[KEY_SESSION_ID] = id
+            _summary.value = null
         }
     }
 
-    fun resumeWorkout(workoutId: Long) {
-        savedStateHandle[KEY_WORKOUT_ID] = workoutId
-        _uiState.update { it.copy(workoutId = workoutId) }
-        startTimer(_uiState.value.elapsedTime)
+    fun resumeWorkout(id: String) {
+        savedStateHandle[KEY_SESSION_ID] = id
+        _summary.value = null
     }
 
-    private fun startTimer(initialTime: Long) {
-        timerJob?.cancel()
+    private fun startTimer() {
+        if (timerJob != null) return
         timerJob = viewModelScope.launch {
-            var time = initialTime
+            val start = System.currentTimeMillis()
             while (isActive) {
-                _uiState.update { it.copy(elapsedTime = time) }
-                savedStateHandle[KEY_ELAPSED_TIME] = time
+                _elapsedTime.value = (System.currentTimeMillis() - start) / 1000
                 delay(1000)
-                time++
             }
         }
     }
 
-    fun toggleExercisePicker(open: Boolean) {
-        savedStateHandle[KEY_IS_PICKER_OPEN] = open
-        _uiState.update { it.copy(isExercisePickerOpen = open) }
-        if (open) searchExercises("")
-    }
-
-    fun searchExercises(query: String) {
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            repository.searchExercises(query).collect { results ->
-                _uiState.update { it.copy(searchResults = results) }
-            }
-        }
-    }
-
-    fun addExercise(exercise: ExerciseEntity) {
-        val workoutId = _uiState.value.workoutId ?: return
-        viewModelScope.launch {
-            repository.addExerciseToWorkout(workoutId, exercise.id, _uiState.value.exercises.size)
-            toggleExercisePicker(false)
-        }
-    }
-
-    fun removeExercise(exerciseId: Long) {
-        val workoutId = _uiState.value.workoutId ?: return
-        viewModelScope.launch {
-            repository.removeExerciseFromWorkout(workoutId, exerciseId)
-        }
-    }
-
-    fun addSet(exerciseId: Long) {
-        val workoutId = _uiState.value.workoutId ?: return
-        viewModelScope.launch {
-            repository.addSet(
-                SetEntity(
-                    workoutId = workoutId,
-                    exerciseId = exerciseId,
-                    weight = 0.0,
-                    reps = 0,
-                    timestamp = System.currentTimeMillis(),
-                    isCompleted = false
-                )
-            )
-        }
-    }
-
-    fun updateSet(setId: Long, weight: Double, reps: Int, isCompleted: Boolean) {
-        viewModelScope.launch {
-            val oldSet = _uiState.value.exercises.flatMap { it.sets }.find { it.id == setId }
-            repository.updateSet(setId, reps, weight, false, isCompleted)
-            
-            if (isCompleted && (oldSet?.isCompleted == false)) {
-                handleSetCompletion(setId, weight, reps)
-            }
-        }
-    }
-
-    private suspend fun handleSetCompletion(setId: Long, weight: Double, reps: Int) {
-        val set = _uiState.value.exercises.flatMap { it.sets }.find { it.id == setId } ?: return
-        startRestTimer(90)
-        
-        val pr = repository.getPersonalRecord(set.exerciseId)
-        val currentMax = StrengthScorer.estimateOneRepMax(weight, reps)
-        val prevMax = pr?.let { StrengthScorer.estimateOneRepMax(it.weight, it.reps) } ?: 0.0
-        
-        if (currentMax > prevMax) {
-            repository.updateSet(setId, reps, weight, true, true)
-        }
-    }
-
-    private fun startRestTimer(seconds: Int) {
-        restTimerJob?.cancel()
-        restTimerJob = viewModelScope.launch {
-            var remaining = seconds
-            while (remaining >= 0) {
-                _uiState.update { it.copy(restTimerSeconds = remaining) }
-                delay(1000)
-                remaining--
-            }
-            _uiState.update { it.copy(restTimerSeconds = null) }
-        }
-    }
-
-    fun skipRestTimer() {
-        restTimerJob?.cancel()
-        _uiState.update { it.copy(restTimerSeconds = null) }
-    }
-
-    fun saveAsTemplate(name: String) {
-        val workoutId = _uiState.value.workoutId ?: return
-        viewModelScope.launch {
-            repository.updateTemplateName(workoutId, name)
-            _uiState.update { WorkoutUiState() }
-        }
+    private fun stopTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        _elapsedTime.value = 0
     }
 
     fun finishWorkout() {
-        val state = _uiState.value
-        val workoutId = state.workoutId ?: return
-        
-        val summary = WorkoutSummary(
-            totalVolume = state.totalVolume,
-            totalSets = state.totalSets,
-            durationSeconds = state.elapsedTime,
-            prCount = state.exercises.flatMap { it.sets }.count { it.isPr }
-        )
-
+        val state = uiState.value
+        val session = state.session ?: return
         viewModelScope.launch {
-            repository.finishWorkout(workoutId, 0) // XP system removed
-            timerJob?.cancel()
-            savedStateHandle.remove<Long>(KEY_WORKOUT_ID)
-            _uiState.update { it.copy(summary = summary, workoutId = null) }
+            val entries = state.exercises.map { it.entry }
+            val sets = state.exercises.flatMap { it.sets }
+            repository.completeWorkout(session, entries, sets)
+            stopTimer()
+            _summary.value = WorkoutSummary(
+                durationSeconds = state.elapsedTime,
+                totalVolume = state.totalVolume,
+                setsCompleted = state.completedSetsCount
+            )
+            savedStateHandle.remove<String>(KEY_SESSION_ID)
         }
     }
 
     fun dismissSummary() {
-        _uiState.update { WorkoutUiState() }
+        _summary.value = null
+    }
+
+    fun addExercise(exercise: Exercise) {
+        val sessionId = savedStateHandle.get<String>(KEY_SESSION_ID) ?: return
+        viewModelScope.launch {
+            repository.addExerciseToSession(sessionId, exercise.id, uiState.value.exercises.size)
+            toggleExercisePicker(false)
+        }
+    }
+
+    fun removeExercise(entry: ExerciseEntry) {
+        viewModelScope.launch {
+            repository.deleteEntry(entry)
+        }
+    }
+
+    fun addSet(entryId: String) {
+        viewModelScope.launch {
+            repository.addSetToEntry(entryId)
+        }
+    }
+
+    fun updateSet(set: SetEntry) {
+        viewModelScope.launch {
+            repository.updateSet(set)
+            if (set.isCompleted) {
+                startRestTimer(90) // Default rest timer
+            }
+        }
+    }
+
+    fun startRestTimer(seconds: Int) {
+        restTimerJob?.cancel()
+        restTimerJob = viewModelScope.launch {
+            _restTimerSeconds.value = seconds
+            while (_restTimerSeconds.value > 0) {
+                delay(1000L)
+                _restTimerSeconds.value -= 1
+            }
+            // Vibrate/Sound logic could go here
+        }
+    }
+
+    fun addRestTime(seconds: Int) {
+        _restTimerSeconds.value += seconds
+    }
+
+    fun skipRest() {
+        restTimerJob?.cancel()
+        _restTimerSeconds.value = 0
+    }
+
+    fun toggleExercisePicker(open: Boolean) {
+        _isExercisePickerOpen.value = open
+        if (open) _searchQuery.value = ""
+    }
+
+    fun searchExercises(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun saveAsTemplate(name: String) {
+        val exercises = uiState.value.exercises
+        viewModelScope.launch {
+            val templateId = UUID.randomUUID().toString()
+            repository.upsertTemplate(WorkoutTemplate(id = templateId, name = name))
+            exercises.forEachIndexed { index, ex ->
+                repository.upsertTemplateExercise(
+                    TemplateExercise(
+                        templateId = templateId,
+                        exerciseId = ex.exercise.id,
+                        orderIndex = index,
+                        targetSets = ex.sets.size,
+                        targetReps = ex.sets.firstOrNull()?.reps ?: 10,
+                        targetWeight = ex.sets.firstOrNull()?.weight
+                    )
+                )
+            }
+            savedStateHandle.remove<String>(KEY_SESSION_ID)
+            _restTimerSeconds.value = 0
+            _summary.value = null
+        }
     }
 
     override fun onCleared() {

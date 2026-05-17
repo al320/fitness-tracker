@@ -1,66 +1,46 @@
 package com.al32.fitcheck.data.local.dao
 
 import androidx.room.*
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
-import com.al32.fitcheck.data.local.entities.WorkoutEntity
-import com.al32.fitcheck.data.local.entities.WorkoutExerciseEntity
+import com.al32.fitcheck.data.local.entities.WorkoutSession
+import com.al32.fitcheck.data.local.entities.ExerciseEntry
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WorkoutDao {
-    @Query("SELECT * FROM workouts WHERE isTemplate = 0 ORDER BY startTime DESC")
-    fun getAllWorkouts(): Flow<List<WorkoutEntity>>
+    @Query("SELECT * FROM workout_sessions ORDER BY startTime DESC")
+    fun getAllSessions(): Flow<List<WorkoutSession>>
 
-    @Query("""
-        SELECT e.* FROM exercises e
-        JOIN workout_exercises we ON e.id = we.exerciseId
-        WHERE we.workoutId = :workoutId
-        ORDER BY we.`order` ASC
-    """)
-    fun getExercisesForWorkout(workoutId: Long): Flow<List<ExerciseEntity>>
+    @Query("SELECT * FROM workout_sessions WHERE endTime IS NULL LIMIT 1")
+    fun getActiveSession(): Flow<WorkoutSession?>
 
-    @Insert
-    suspend fun insertWorkoutExercise(workoutExercise: WorkoutExerciseEntity)
-
-    @Query("SELECT * FROM workouts WHERE isTemplate = 1")
-    fun getTemplates(): Flow<List<WorkoutEntity>>
-
-    @Query("SELECT * FROM workouts WHERE endTime IS NULL AND isTemplate = 0 LIMIT 1")
-    fun getActiveWorkout(): Flow<WorkoutEntity?>
-
-    @Query("SELECT * FROM workouts WHERE id = :id")
-    suspend fun getWorkoutById(id: Long): WorkoutEntity?
-
-    @Query("UPDATE workout_exercises SET `order` = :newOrder WHERE workoutId = :workoutId AND exerciseId = :exerciseId")
-    suspend fun updateExerciseOrder(workoutId: Long, exerciseId: Long, newOrder: Int)
-
-    @Query("DELETE FROM workout_exercises WHERE workoutId = :workoutId AND exerciseId = :exerciseId")
-    suspend fun removeExerciseFromWorkout(workoutId: Long, exerciseId: Long)
-
-    @Query("SELECT * FROM workouts")
-    suspend fun getAllWorkoutsSync(): List<WorkoutEntity>
-
-    @Query("SELECT * FROM workout_exercises")
-    suspend fun getAllWorkoutExercisesSync(): List<WorkoutExerciseEntity>
+    @Query("SELECT * FROM workout_sessions WHERE id = :id")
+    suspend fun getSessionById(id: String): WorkoutSession?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWorkouts(workouts: List<WorkoutEntity>)
+    suspend fun insertSession(session: WorkoutSession)
 
-    @Query("SELECT * FROM workout_exercises WHERE workoutId = :workoutId")
-    suspend fun getWorkoutExerciseEntriesSync(workoutId: Long): List<WorkoutExerciseEntity>
+    @Upsert
+    suspend fun upsertSession(session: WorkoutSession)
 
-    @Query("UPDATE workouts SET name = :name WHERE id = :id")
-    suspend fun updateWorkoutName(id: Long, name: String)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWorkout(workout: WorkoutEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWorkoutExercises(workoutExercises: List<WorkoutExerciseEntity>)
+    @Update
+    suspend fun updateSession(session: WorkoutSession)
 
     @Delete
-    suspend fun deleteWorkout(workout: WorkoutEntity)
+    suspend fun deleteSession(session: WorkoutSession)
 
-    @Query("UPDATE workouts SET endTime = :endTime, totalXpGained = :xp WHERE id = :id")
-    suspend fun finishWorkout(id: Long, endTime: Long, xp: Int)
+    // Exercise Entries
+    @Query("SELECT * FROM exercise_entries WHERE sessionId = :sessionId ORDER BY orderIndex ASC")
+    fun getEntriesForSession(sessionId: String): Flow<List<ExerciseEntry>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEntry(entry: ExerciseEntry)
+
+    @Delete
+    suspend fun deleteEntry(entry: ExerciseEntry)
+
+    @Query("UPDATE exercise_entries SET orderIndex = :newOrder WHERE id = :entryId")
+    suspend fun updateEntryOrder(entryId: String, newOrder: Int)
+
+    @Query("SELECT * FROM exercise_entries WHERE sessionId = :sessionId")
+    fun getEntriesForSessionSync(sessionId: String): Flow<List<ExerciseEntry>>
 }

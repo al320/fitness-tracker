@@ -7,27 +7,27 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
 @Entity(
-    tableName = "workout_exercises",
+    tableName = "exercise_entries",
     foreignKeys = [
         ForeignKey(
-            entity = WorkoutEntity::class,
+            entity = WorkoutSession::class,
             parentColumns = ["id"],
-            childColumns = ["workoutId"],
+            childColumns = ["sessionId"],
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
-            entity = ExerciseEntity::class,
+            entity = Exercise::class,
             parentColumns = ["id"],
             childColumns = ["exerciseId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("workoutId"), Index("exerciseId")]
+    indices = [Index("sessionId"), Index("exerciseId")]
 )
 @Serializable
-data class WorkoutExerciseEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val workoutId: Long,
-    val exerciseId: Long,
-    val order: Int
+data class ExerciseEntry(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val exerciseId: String,
+    val orderIndex: Int
 )

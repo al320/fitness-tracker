@@ -1,10 +1,17 @@
 package com.al32.fitcheck.ui.features.dashboard
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,187 +20,305 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.al32.fitcheck.data.local.entities.WorkoutEntity
+import com.al32.fitcheck.data.local.entities.WorkoutTemplate
 import com.al32.fitcheck.domain.physiology.MuscleGroup
+import com.al32.fitcheck.domain.physiology.MuscleWithTimeRemaining
+import com.al32.fitcheck.domain.physiology.displayName
 import com.al32.fitcheck.ui.components.BodyHeatmap
-import com.al32.fitcheck.ui.theme.FitcheckTheme
-import com.al32.fitcheck.ui.theme.EliteWhite
+import com.al32.fitcheck.ui.utils.formatRecoveryTime
 import com.al32.fitcheck.ui.viewmodel.DashboardUiState
 import com.al32.fitcheck.ui.viewmodel.DashboardViewModel
+import com.al32.fitcheck.ui.viewmodel.TodayWorkoutState
 
 @Composable
 fun DashboardScreen(
     onStartWorkout: () -> Unit,
-    onContinueWorkout: (Long) -> Unit,
-    onStartTemplate: (WorkoutEntity) -> Unit,
+    onContinueWorkout: (String) -> Unit,
+    onStartTemplate: (WorkoutTemplate) -> Unit,
+    onConfigureSchedule: () -> Unit,
     viewModel: DashboardViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    DashboardContent(onStartWorkout, onContinueWorkout, onStartTemplate, uiState)
+    DashboardContent(onStartWorkout, onContinueWorkout, onStartTemplate, onConfigureSchedule, uiState)
 }
 
 @Composable
 fun DashboardContent(
     onStartWorkout: () -> Unit,
-    onContinueWorkout: (Long) -> Unit,
-    onStartTemplate: (WorkoutEntity) -> Unit,
+    onContinueWorkout: (String) -> Unit,
+    onStartTemplate: (WorkoutTemplate) -> Unit,
+    onConfigureSchedule: () -> Unit,
     uiState: DashboardUiState
 ) {
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onStartWorkout,
-                containerColor = EliteWhite,
-                contentColor = Color.Black
+                containerColor = Color(0xFFFF851B),
+                contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, null)
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Spacer(Modifier.height(16.dp))
-                Text("RECOVERY BRIEFING", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-            }
+            Spacer(Modifier.height(12.dp))
+            
+            BodyHeatmap(
+                muscleStates = uiState.muscleStates,
+                modifier = Modifier.fillMaxWidth().height(260.dp)
+            )
 
-            item {
-                BodyHeatmap(muscleStates = uiState.muscleStates)
-            }
+            val recovering = uiState.muscleStates.filter { it.value.score < 0.85f }
+                .map { MuscleWithTimeRemaining(it.key, it.value.hoursUntilRecovered) }
+            val ready = uiState.muscleStates.filter { it.value.score >= 0.85f }.keys.toList()
+            
+            CollapsibleRecoveryCard(
+                recoveringMuscles = recovering,
+                readyMuscles = ready
+            )
 
-            if (uiState.recommendations.isNotEmpty()) {
-                item {
-                    RecommendationCard(uiState.recommendations)
-                }
-            }
+            TodayWorkoutCard(
+                state = uiState.todayWorkout, 
+                onStartQuick = onStartWorkout, 
+                onStartTemplate = onStartTemplate, 
+                onConfigure = onConfigureSchedule
+            )
 
-            item {
-                QuickStartGrid(
-                    activeWorkout = uiState.activeWorkout,
-                    templates = uiState.templates,
-                    onContinue = onContinueWorkout,
-                    onStartTemplate = onStartTemplate
+            TrainingPlanSection(uiState.templates, onStartTemplate)
+
+            WeeklyVolumeSection(uiState)
+
+            StatsSummaryRow(uiState)
+
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CollapsibleRecoveryCard(
+    recoveringMuscles: List<MuscleWithTimeRemaining>,
+    readyMuscles: List<MuscleGroup>
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            // Header — always visible
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(8.dp).background(
+                        color = if (recoveringMuscles.isEmpty()) Color(0xFF2E7D32) else Color(0xFFEF5350),
+                        shape = CircleShape
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (recoveringMuscles.isEmpty()) "ALL MUSCLES READY"
+                           else "NEEDS RECOVERY (${recoveringMuscles.size})",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (recoveringMuscles.isEmpty()) Color(0xFF4CAF50) else Color(0xFFEF5350),
+                    modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.Black
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.Gray
                 )
             }
 
-            item {
-                MuscleVolumeSection(uiState)
-            }
-
-            item {
-                TrainingStatsRow(uiState)
-            }
-            
-            item { Spacer(Modifier.height(100.dp)) }
-        }
-    }
-}
-
-@Composable
-fun RecommendationCard(recs: List<String>) {
-    Surface(
-        color = Color.DarkGray.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("TRAINING FOCUS", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            recs.forEach { rec ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val color = if (rec.contains("RECOVERY")) Color(0xFFD32F2F) else Color(0xFF00ACC1)
-                    Box(Modifier.size(6.dp).background(color, RoundedCornerShape(3.dp)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(rec, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickStartGrid(
-    activeWorkout: WorkoutEntity?,
-    templates: List<WorkoutEntity>,
-    onContinue: (Long) -> Unit,
-    onStartTemplate: (WorkoutEntity) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (activeWorkout != null) {
-            Button(
-                onClick = { onContinue(activeWorkout.id) },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EliteWhite)
+            // Expandable section
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(200)) + fadeOut(tween(150))
             ) {
-                Icon(Icons.Default.PlayArrow, null, tint = Color.Black)
-                Spacer(Modifier.width(8.dp))
-                Text("RESUME: ${activeWorkout.name.uppercase()}", color = Color.Black, fontWeight = FontWeight.Black)
-            }
-        }
-
-        Text("QUICK START", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-        templates.take(4).chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { template ->
-                    OutlinedButton(
-                        onClick = { onStartTemplate(template) },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
-                    ) {
-                        Text(template.name.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    if (recoveringMuscles.isNotEmpty()) {
+                        Text("Recovering", color = Color.Gray,
+                            style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            recoveringMuscles.sortedBy { it.hoursRemaining }.forEach { m ->
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text("${m.muscleGroup.displayName()} — ${formatRecoveryTime(m.hoursRemaining.toFloat())}",
+                                        style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+                    if (readyMuscles.isNotEmpty()) {
+                        Text("Ready to train", color = Color.Gray,
+                            style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            readyMuscles.forEach { m ->
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text(m.displayName(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF1565C0)) }
+                                )
+                            }
+                        }
                     }
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun MuscleVolumeSection(uiState: DashboardUiState) {
-    val states = uiState.muscleStates
-    val pushVal = (states[MuscleGroup.LOWER_CHEST]?.fatigueLevel ?: 0f) / 2f
-    val pullVal = (states[MuscleGroup.LATS]?.fatigueLevel ?: 0f) / 2f
-    val legsVal = (states[MuscleGroup.QUADS]?.fatigueLevel ?: 0f) / 2f
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("TRAINING INTENSITY BALANCE", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-        VolumeBar("PUSH PATTERNS", pushVal.coerceIn(0f, 1f))
-        VolumeBar("PULL PATTERNS", pullVal.coerceIn(0f, 1f))
-        VolumeBar("LOWER BODY", legsVal.coerceIn(0f, 1f))
-    }
-}
-
-@Composable
-fun VolumeBar(label: String, progress: Float) {
-    Column {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+fun TodayWorkoutCard(
+    state: TodayWorkoutState,
+    onStartQuick: () -> Unit,
+    onStartTemplate: (WorkoutTemplate) -> Unit,
+    onConfigure: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    when(state) {
+                        is TodayWorkoutState.RestDay -> Icons.Default.Bedtime
+                        is TodayWorkoutState.WorkoutReady -> Icons.Default.FitnessCenter
+                        else -> Icons.AutoMirrored.Filled.EventNote
+                    },
+                    null,
+                    tint = Color(0xFFFF851B)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text("TODAY'S WORKOUT", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(16.dp))
+            
+            when(state) {
+                is TodayWorkoutState.NotConfigured -> {
+                    Text("No routine scheduled", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = onConfigure,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF851B))
+                    ) {
+                        Text("CONFIGURE WEEKLY PLAN")
+                    }
+                }
+                is TodayWorkoutState.RestDay -> {
+                    Text("REST DAY", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text("RECOVERY IN PROGRESS", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+                is TodayWorkoutState.WorkoutReady -> {
+                    Text(state.template.name.uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { onStartTemplate(state.template) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF851B))
+                    ) {
+                        Text("START WORKOUT")
+                    }
+                }
+            }
         }
-        Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth().height(4.dp),
-            color = Color(0xFF00ACC1),
-            trackColor = Color.DarkGray.copy(alpha = 0.3f),
-        )
     }
 }
 
 @Composable
-fun TrainingStatsRow(uiState: DashboardUiState) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        SimpleStat("STREAK", "${uiState.userStats.currentStreak}D")
-        SimpleStat("SESSIONS", uiState.userStats.totalWorkouts.toString())
-        SimpleStat("VOLUME", String.format(java.util.Locale.getDefault(), "%.1fM", uiState.userStats.totalXp / 1000000.0))
+fun TrainingPlanSection(templates: List<WorkoutTemplate>, onSelect: (WorkoutTemplate) -> Unit) {
+    Column {
+        Text("YOUR TRAINING PLAN", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color.Gray)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            templates.take(3).forEach { template ->
+                Card(
+                    modifier = Modifier.width(160.dp).clickable { onSelect(template) },
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(template.name.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                        Text("Suggested", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2196F3))
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun SimpleStat(label: String, value: String) {
+fun WeeklyVolumeSection(uiState: DashboardUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("WEEKLY VOLUME TARGETS", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+        uiState.weeklySetCurrent.entries.take(4).forEach { (group, count) ->
+            val target = uiState.weeklySetTargets[group] ?: 10
+            val progress = count.toFloat() / target
+            val color = when {
+                progress >= 1.0f -> Color.Green
+                progress >= 0.5f -> Color(0xFFFF851B)
+                else -> Color.Red
+            }
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(group.name.replace("_", " "), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Text("$count / $target sets", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                }
+                Spacer(Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = color,
+                    trackColor = Color.DarkGray.copy(alpha = 0.3f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatsSummaryRow(uiState: DashboardUiState) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        DashboardStatItem("STREAK", "0D")
+        DashboardStatItem("SESSIONS", uiState.sessionCount.toString())
+        DashboardStatItem("VOLUME", "0.0M")
+    }
+}
+
+@Composable
+fun DashboardStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)

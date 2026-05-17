@@ -14,12 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.al32.fitcheck.data.local.entities.ExerciseEntity
 import com.al32.fitcheck.ui.features.workout.ExercisePickerSheet
 import com.al32.fitcheck.ui.theme.AmoledBlack
 import com.al32.fitcheck.ui.theme.EliteWhite
 import com.al32.fitcheck.ui.theme.Gunmetal
-import com.al32.fitcheck.ui.viewmodel.WorkoutUiState
 import com.al32.fitcheck.ui.viewmodel.WorkoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,10 +27,7 @@ fun TemplateEditScreen(
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var templateName by remember(uiState.workoutId) { mutableStateOf("") }
-    
-    // Initial name load if editing existing
-    // For now we use the ViewModel's active workout as the edit target
+    var templateName by remember(uiState.session?.id) { mutableStateOf(uiState.session?.name ?: "") }
     
     Scaffold(
         topBar = {
@@ -61,7 +56,7 @@ fun TemplateEditScreen(
                         viewModel.saveAsTemplate(templateName)
                         onBack()
                     }) {
-                        Text("SAVE", fontWeight = FontWeight.Black, color = EliteWhite)
+                        Text("SAVE", fontWeight = FontWeight.Black, color = Color(0xFFFF851B))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AmoledBlack)
@@ -84,7 +79,7 @@ fun TemplateEditScreen(
                         ) {
                             Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelLarge, color = Color.Gray)
                             Text(exerciseWithSets.exercise.name.uppercase(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { viewModel.removeExercise(exerciseWithSets.exercise.id) }) {
+                            IconButton(onClick = { viewModel.removeExercise(exerciseWithSets.entry) }) {
                                 Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
                             }
                         }
