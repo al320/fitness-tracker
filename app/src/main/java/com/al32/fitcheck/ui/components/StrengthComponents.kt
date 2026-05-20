@@ -1,6 +1,5 @@
 package com.al32.fitcheck.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -9,9 +8,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.al32.fitcheck.R
 import com.al32.fitcheck.domain.scoring.StrengthLevel
 
 @Composable
@@ -20,8 +21,8 @@ fun ExerciseStrengthCard(
     estimated1RM: Float,
     bodyweightRatio: Float,
     currentLevel: StrengthLevel,
-    nextLevel: StrengthLevel,
-    nextLevelRatio: Float,
+    nextLevel: StrengthLevel?,
+    kgToNext: Int,
     lastSessionSummary: String,
     bodyweightKg: Float,
     progress: Float
@@ -51,9 +52,9 @@ fun ExerciseStrengthCard(
             
             Spacer(Modifier.height(16.dp))
             
-            if (currentLevel != StrengthLevel.WORLD_CLASS) {
+            if (nextLevel != null) {
                 Text(
-                    text = "NEXT: $nextLevel — NEEDS ${(nextLevelRatio * bodyweightKg).toInt()} KG (${String.format("%.2f", nextLevelRatio)}× BW)",
+                    text = stringResource(R.string.msg_needs_kg_to_reach, kgToNext, nextLevel.name),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
                     fontWeight = FontWeight.Bold
@@ -70,19 +71,21 @@ fun ExerciseStrengthCard(
                 )
             } else {
                 Text(
-                    text = "MAXIMUM LEVEL REACHED",
+                    text = stringResource(R.string.tier_world_class),
                     style = MaterialTheme.typography.labelSmall,
-                    color = currentLevel.color(),
-                    fontWeight = FontWeight.Bold
+                    color = Color(0xFFFFD700), // Gold
+                    fontWeight = FontWeight.Black
                 )
             }
             
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = lastSessionSummary,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.Gray.copy(alpha = 0.8f)
-            )
+            if (lastSessionSummary.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = lastSessionSummary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray.copy(alpha = 0.8f)
+                )
+            }
         }
     }
 }

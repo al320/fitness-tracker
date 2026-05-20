@@ -2,6 +2,7 @@ package com.al32.fitcheck.data.local.dao
 
 import androidx.room.*
 import com.al32.fitcheck.data.local.entities.SetEntry
+import com.al32.fitcheck.domain.physiology.MovementPattern
 import com.al32.fitcheck.domain.physiology.MuscleGroup
 import kotlinx.coroutines.flow.Flow
 
@@ -36,7 +37,7 @@ interface SetDao {
     suspend fun getPersonalRecord(exerciseId: String): SetEntry?
 
     @Query("""
-        SELECT s.weight, s.reps, s.completedAt, ex.primaryMuscles, ex.secondaryMuscles 
+        SELECT s.weight, s.reps, s.completedAt, ex.primaryMuscles, ex.secondaryMuscles, ex.movementPattern
         FROM set_entries s
         JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
         JOIN exercises ex ON ee.exerciseId = ex.id
@@ -78,6 +79,22 @@ interface SetDao {
         GROUP BY ee.exerciseId
     """)
     fun getBestE1RMPerExercise(since: Long): Flow<List<ExerciseBest1RM>>
+
+    @Query("""
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        WHERE ee.sessionId = :sessionId AND s.isCompleted = 1
+    """)
+    suspend fun getCompletedSetsForSessionSync(sessionId: String): List<SetEntry>
+
+    @Query("""
+        SELECT s.* FROM set_entries s
+        JOIN exercise_entries ee ON s.exerciseEntryId = ee.id
+        WHERE ee.exerciseId = :exerciseId AND s.isCompleted = 1
+    """)
+    suspend fun getCompletedSetsForExerciseSync(exerciseId: String): List<SetEntry>
+    @Query("SELECT * FROM set_entries WHERE exerciseEntryId = :exerciseEntryId")
+    suspend fun getSetsForEntrySyncNow(exerciseEntryId: String): List<SetEntry>
 }
 
 data class SetWithPhysiology(
@@ -85,7 +102,8 @@ data class SetWithPhysiology(
     val reps: Int,
     val completedAt: Long,
     val primaryMuscles: List<MuscleGroup>,
-    val secondaryMuscles: List<MuscleGroup>
+    val secondaryMuscles: List<MuscleGroup>,
+    val movementPattern: MovementPattern
 )
 
 data class ExerciseBest1RM(val exerciseId: String, val bestE1RM: Float)

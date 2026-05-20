@@ -8,13 +8,21 @@ import com.al32.fitcheck.data.repository.FitcheckRepository
 import com.al32.fitcheck.domain.recovery.RecoveryEngine
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import java.text.SimpleDateFormat
+import java.util.*
+
+enum class VolumeRange {
+    WEEK, MONTH, ALL
+}
 
 data class AnalyticsUiState(
     val volumeHistory: List<Pair<String, Double>> = emptyList(),
     val muscleIntensity: Map<String, Float> = emptyMap(),
     val totalWorkouts: Int = 0,
     val totalVolume: Double = 0.0,
-    val sessionHistory: List<WorkoutSessionWithDetails> = emptyList()
+    val sessionHistory: List<WorkoutSessionWithDetails> = emptyList(),
+    val selectedRange: VolumeRange = VolumeRange.MONTH,
+    val hasEnoughDataForChart: Boolean = false
 )
 
 data class WorkoutSessionWithDetails(
@@ -33,28 +41,45 @@ class AnalyticsViewModel(
     private val repository: FitcheckRepository
 ) : ViewModel() {
 
-    private val thirtyDaysAgo = System.currentTimeMillis() - (86400000L * 30)
+    private val _selectedRange = MutableStateFlow(VolumeRange.MONTH)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<AnalyticsUiState> = combine(
         repository.allSessions,
-        repository.getCompletedSetsWithPhysiology(thirtyDaysAgo)
-    ) { sessions, sets ->
+        repository.getDailyVolume(),
+        _selectedRange,
+        repository.getCompletedSetsWithPhysiology(0)
+    ) { sessions, dailyVolumes, range, sets ->
+        
+        val filteredVolumes = when (range) {
+            VolumeRange.WEEK -> {
+                val cutoff = System.currentTimeMillis() - 7 * 24 * 3600 * 1000L
+                dailyVolumes.filter { 
+                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it.sessionDate)
+                    date != null && date.time >= cutoff
+                }
+            }
+            VolumeRange.MONTH -> {
+                val cutoff = System.currentTimeMillis() - 30 * 24 * 3600 * 1000L
+                dailyVolumes.filter { 
+                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it.sessionDate)
+                    date != null && date.time >= cutoff
+                }
+            }
+            VolumeRange.ALL -> dailyVolumes
+        }
+
+        val history = filteredVolumes.map { 
+            val rawDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it.sessionDate)
+            val formatted = rawDate?.let { d -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(d) } ?: it.sessionDate
+            formatted to it.totalVolume 
+        }
+
         val muscleStates = RecoveryEngine.computeReadinessFromJoined(sets)
         val totalVol = sets.sumOf { (it.weight * it.reps).toDouble() }
-        
-        val history = sessions.filter { it.endTime != null }
-            .sortedBy { it.startTime }
-            .takeLast(10)
-            .map { session ->
-                val sessionSets = sets.filter { it.completedAt >= session.startTime && it.completedAt <= (session.endTime ?: Long.MAX_VALUE) }
-                val sessionVolume = sessionSets.sumOf { (it.weight * it.reps).toDouble() }
-                val date = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(session.startTime))
-                date to sessionVolume
-            }
 
-        // Detailed session history
         val fullHistory = sessions.filter { it.isCompleted }
+            .sortedByDescending { it.startTime }
             .map { session ->
                 val entries = repository.getEntriesForSessionSync(session.id)
                 val sessionSets = repository.getSetsForSession(session.id).first()
@@ -72,15 +97,21 @@ class AnalyticsViewModel(
             }
 
         AnalyticsUiState(
-            totalWorkouts = sessions.count { it.endTime != null },
+            totalWorkouts = sessions.count { it.isCompleted },
             totalVolume = totalVol,
             muscleIntensity = muscleStates.entries.associate { it.key.name to it.value.score },
             volumeHistory = history,
-            sessionHistory = fullHistory
+            sessionHistory = fullHistory,
+            selectedRange = range,
+            hasEnoughDataForChart = history.size >= 2
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = AnalyticsUiState()
     )
+
+    fun setRange(range: VolumeRange) {
+        _selectedRange.value = range
+    }
 }

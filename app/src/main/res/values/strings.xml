@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">Fitcheck</string>
+    <string name="onboarding_welcome">Welcome to Fitcheck</string>
+    <string name="onboarding_subtitle">Let\'s get your profile set up to track strength standards accurately.</string>
+    <string name="label_name">Full Name</string>
+    <string name="label_bodyweight">Bodyweight</string>
+    <string name="action_get_started">Get Started</string>
+    <string name="msg_needs_bw">Set your bodyweight in Profile to see standards</string>
+    <string name="msg_needs_kg_to_reach">NEEDS %1$d KG TO REACH %2$s</string>
+    <string name="tier_world_class">WORLD CLASS</string>
+    <string name="chart_empty_state">Log 2+ workouts to see your volume trend</string>
+    <string name="btn_finish">Finish</string>
+    <string name="btn_start">Start</string>
+    <string name="dialog_discard_title">Discard session?</string>
+    <string name="dialog_discard_msg">No sets logged. Do you want to discard this session?</string>
+    <string name="error_invalid_input">Invalid weight or reps</string>
 </resources>

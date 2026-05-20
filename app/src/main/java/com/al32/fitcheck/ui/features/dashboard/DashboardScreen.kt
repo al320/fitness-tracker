@@ -17,9 +17,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.al32.fitcheck.R
 import com.al32.fitcheck.data.local.entities.WorkoutTemplate
 import com.al32.fitcheck.domain.physiology.MuscleGroup
 import com.al32.fitcheck.domain.physiology.MuscleWithTimeRemaining
@@ -39,6 +42,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
     DashboardContent(onStartWorkout, onContinueWorkout, onStartTemplate, onConfigureSchedule, uiState)
 }
 
@@ -116,8 +120,6 @@ fun CollapsibleRecoveryCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // Header — always visible
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
                 verticalAlignment = Alignment.CenterVertically
@@ -144,7 +146,6 @@ fun CollapsibleRecoveryCard(
                 )
             }
 
-            // Expandable section
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(tween(200)) + fadeIn(tween(200)),
@@ -153,8 +154,7 @@ fun CollapsibleRecoveryCard(
                 Column {
                     Spacer(Modifier.height(12.dp))
                     if (recoveringMuscles.isNotEmpty()) {
-                        Text("Recovering", color = Color.Gray,
-                            style = MaterialTheme.typography.labelSmall)
+                        Text("Recovering", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.height(6.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -171,8 +171,7 @@ fun CollapsibleRecoveryCard(
                         Spacer(Modifier.height(10.dp))
                     }
                     if (readyMuscles.isNotEmpty()) {
-                        Text("Ready to train", color = Color.Gray,
-                            style = MaterialTheme.typography.labelSmall)
+                        Text("Ready to train", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.height(6.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             readyMuscles.forEach { m ->
@@ -260,15 +259,19 @@ fun TrainingPlanSection(templates: List<WorkoutTemplate>, onSelect: (WorkoutTemp
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            templates.take(3).forEach { template ->
-                Card(
-                    modifier = Modifier.width(160.dp).clickable { onSelect(template) },
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(template.name.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
-                        Text("Suggested", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2196F3))
+            if (templates.isEmpty()) {
+                Text("No routines created yet", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray)
+            } else {
+                templates.take(3).forEach { template ->
+                    Card(
+                        modifier = Modifier.width(160.dp).clickable { onSelect(template) },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(template.name.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                            Text("Suggested", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2196F3))
+                        }
                     }
                 }
             }
@@ -280,26 +283,31 @@ fun TrainingPlanSection(templates: List<WorkoutTemplate>, onSelect: (WorkoutTemp
 fun WeeklyVolumeSection(uiState: DashboardUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("WEEKLY VOLUME TARGETS", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-        uiState.weeklySetCurrent.entries.take(4).forEach { (group, count) ->
-            val target = uiState.weeklySetTargets[group] ?: 10
-            val progress = count.toFloat() / target
-            val color = when {
-                progress >= 1.0f -> Color.Green
-                progress >= 0.5f -> Color(0xFFFF851B)
-                else -> Color.Red
-            }
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(group.name.replace("_", " "), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    Text("$count / $target sets", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        
+        if (uiState.weeklySetCurrent.isEmpty()) {
+            Text("No training data this week", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray)
+        } else {
+            uiState.weeklySetCurrent.entries.take(4).forEach { (group, count) ->
+                val target = uiState.weeklySetTargets[group] ?: 10
+                val progress = count.toFloat() / target
+                val color = when {
+                    progress >= 0.8f -> Color.Green
+                    progress >= 0.5f -> Color(0xFFFF851B)
+                    else -> Color.Red
                 }
-                Spacer(Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
-                    color = color,
-                    trackColor = Color.DarkGray.copy(alpha = 0.3f),
-                )
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(group.name.replace("_", " "), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text("$count / $target sets", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(4.dp),
+                        color = color,
+                        trackColor = Color.DarkGray.copy(alpha = 0.3f),
+                    )
+                }
             }
         }
     }
@@ -313,7 +321,15 @@ fun StatsSummaryRow(uiState: DashboardUiState) {
     ) {
         DashboardStatItem("STREAK", "0D")
         DashboardStatItem("SESSIONS", uiState.sessionCount.toString())
-        DashboardStatItem("VOLUME", "0.0M")
+        DashboardStatItem("VOLUME", formatVolume(uiState.totalVolume))
+    }
+}
+
+private fun formatVolume(value: Float): String {
+    return when {
+        value >= 1_000_000 -> String.format("%.1fM", value / 1_000_000.0)
+        value >= 1_000 -> String.format("%.1fK", value / 1_000.0)
+        else -> String.format("%.0f", value)
     }
 }
 
@@ -322,5 +338,48 @@ fun DashboardStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OnboardingSheet(onSave: (String, Float) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = { /* Block dismissal until saved */ },
+        dragHandle = null,
+        containerColor = Color(0xFF111111)
+    ) {
+        Column(Modifier.padding(24.dp).padding(bottom = 32.dp)) {
+            Text(stringResource(R.string.onboarding_welcome), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
+            Text(stringResource(R.string.onboarding_subtitle), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Spacer(Modifier.height(24.dp))
+            OutlinedTextField(
+                value = name, 
+                onValueChange = { name = it }, 
+                label = { Text("Name") }, 
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF851B), unfocusedBorderColor = Color.DarkGray)
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = weight, 
+                onValueChange = { weight = it }, 
+                label = { Text("Bodyweight (kg)") }, 
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF851B), unfocusedBorderColor = Color.DarkGray)
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onSave(name, weight.toFloatOrNull() ?: 0f) },
+                enabled = name.isNotBlank() && weight.toFloatOrNull() != null && (weight.toFloatOrNull() ?: 0f) > 0f,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF851B))
+            ) {
+                Text("GET STARTED", fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

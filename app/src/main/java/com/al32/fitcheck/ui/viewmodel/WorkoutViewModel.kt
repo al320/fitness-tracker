@@ -19,13 +19,10 @@ data class WorkoutUiState(
     val isExercisePickerOpen: Boolean = false,
     val searchResults: List<Exercise> = emptyList(),
     val restTimerSeconds: Int = 0,
-    val summary: WorkoutSummary? = null
-)
-
-data class WorkoutSummary(
-    val durationSeconds: Long,
-    val totalVolume: Float,
-    val setsCompleted: Int
+    val isTimerRunning: Boolean = false,
+    val isFinishing: Boolean = false,
+    val weightError: String? = null,
+    val repsError: String? = null
 )
 
 data class ExerciseWithSets(
@@ -46,8 +43,11 @@ class WorkoutViewModel(
     private val _isExercisePickerOpen = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
     private val _elapsedTime = MutableStateFlow(0L)
+    private val _isTimerRunning = MutableStateFlow(false)
+    private val _isFinishing = MutableStateFlow(false)
     private val _restTimerSeconds = MutableStateFlow(0)
-    private val _summary = MutableStateFlow<WorkoutSummary?>(null)
+    private val _weightError = MutableStateFlow<String?>(null)
+    private val _repsError = MutableStateFlow<String?>(null)
 
     private var timerJob: Job? = null
     private var restTimerJob: Job? = null
@@ -87,15 +87,19 @@ class WorkoutViewModel(
         sessionIdFlow,
         repository.activeSession,
         exercisesWithSetsFlow,
-        combine(_elapsedTime, _isExercisePickerOpen, searchResultsFlow, _restTimerSeconds, _summary) { args ->
+        combine(_elapsedTime, _isTimerRunning, _isExercisePickerOpen, searchResultsFlow, _restTimerSeconds, _isFinishing, _weightError, _repsError) { args ->
             args
         }
     ) { sessionId, activeSession, exercises, other ->
         val elapsed = other[0] as Long
-        val pickerOpen = other[1] as Boolean
-        val searchResults = other[2] as List<Exercise>
-        val restTimer = other[3] as Int
-        val summary = other[4] as WorkoutSummary?
+        val timerRunning = other[1] as Boolean
+        val pickerOpen = other[2] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val searchResults = other[3] as List<Exercise>
+        val restTimer = other[4] as Int
+        val finishing = other[5] as Boolean
+        val wErr = other[6] as String?
+        val rErr = other[7] as String?
 
         val session = if (sessionId != null && activeSession?.id == sessionId) activeSession else null
         
@@ -115,7 +119,10 @@ class WorkoutViewModel(
             isExercisePickerOpen = pickerOpen,
             searchResults = searchResults,
             restTimerSeconds = restTimer,
-            summary = summary
+            isTimerRunning = timerRunning,
+            isFinishing = finishing,
+            weightError = wErr,
+            repsError = rErr
         )
     }.stateIn(
         scope = viewModelScope,
@@ -123,32 +130,37 @@ class WorkoutViewModel(
         initialValue = WorkoutUiState()
     )
 
-    init {
-        sessionIdFlow.onEach { id ->
-            if (id != null) startTimer()
-            else stopTimer()
-        }.launchIn(viewModelScope)
-    }
-
-    fun startWorkout(name: String) {
-        viewModelScope.launch {
+    fun startWorkout(name: String, templateId: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
             val id = repository.createSession(name)
-            savedStateHandle[KEY_SESSION_ID] = id
-            _summary.value = null
+            if (templateId != null) {
+                repository.startWorkoutFromTemplate(templateId, id)
+            }
+            withContext(Dispatchers.Main) {
+                savedStateHandle[KEY_SESSION_ID] = id
+            }
         }
     }
 
     fun resumeWorkout(id: String) {
         savedStateHandle[KEY_SESSION_ID] = id
-        _summary.value = null
+    }
+
+    fun toggleTimer() {
+        if (_isTimerRunning.value) {
+            stopTimer()
+        } else {
+            startTimer()
+        }
     }
 
     private fun startTimer() {
         if (timerJob != null) return
+        _isTimerRunning.value = true
         timerJob = viewModelScope.launch {
-            val start = System.currentTimeMillis()
+            val startTime = System.currentTimeMillis() - (_elapsedTime.value * 1000)
             while (isActive) {
-                _elapsedTime.value = (System.currentTimeMillis() - start) / 1000
+                _elapsedTime.value = (System.currentTimeMillis() - startTime) / 1000
                 delay(1000)
             }
         }
@@ -157,60 +169,77 @@ class WorkoutViewModel(
     private fun stopTimer() {
         timerJob?.cancel()
         timerJob = null
-        _elapsedTime.value = 0
+        _isTimerRunning.value = false
     }
 
-    fun finishWorkout() {
-        val state = uiState.value
-        val session = state.session ?: return
-        viewModelScope.launch {
-            val entries = state.exercises.map { it.entry }
-            val sets = state.exercises.flatMap { it.sets }
-            repository.completeWorkout(session, entries, sets)
-            stopTimer()
-            _summary.value = WorkoutSummary(
-                durationSeconds = state.elapsedTime,
-                totalVolume = state.totalVolume,
-                setsCompleted = state.completedSetsCount
-            )
-            savedStateHandle.remove<String>(KEY_SESSION_ID)
+    fun finishWorkout(onComplete: (String) -> Unit) {
+        val sessionId = savedStateHandle.get<String>(KEY_SESSION_ID) ?: return
+        if (_isFinishing.value) return
+        _isFinishing.value = true
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val session = repository.getSessionById(sessionId) ?: run {
+                    withContext(Dispatchers.Main) { _isFinishing.value = false }
+                    return@launch
+                }
+                val entries = repository.getEntriesForSessionSync(sessionId)
+                val sets = entries.flatMap { repository.getSetsForEntrySync(it.id) }
+                
+                repository.completeWorkout(session, entries, sets)
+                
+                withContext(Dispatchers.Main) {
+                    stopTimer()
+                    savedStateHandle.remove<String>(KEY_SESSION_ID)
+                    _isFinishing.value = false
+                    onComplete(sessionId)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { _isFinishing.value = false }
+            }
         }
-    }
-
-    fun dismissSummary() {
-        _summary.value = null
     }
 
     fun addExercise(exercise: Exercise) {
         val sessionId = savedStateHandle.get<String>(KEY_SESSION_ID) ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.addExerciseToSession(sessionId, exercise.id, uiState.value.exercises.size)
-            toggleExercisePicker(false)
+            withContext(Dispatchers.Main) {
+                toggleExercisePicker(false)
+            }
         }
     }
 
     fun removeExercise(entry: ExerciseEntry) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.deleteEntry(entry)
         }
     }
 
     fun addSet(entryId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.addSetToEntry(entryId)
         }
     }
 
     fun updateSet(set: SetEntry) {
-        viewModelScope.launch {
+        if (set.weight < 0 || set.reps < 0) {
+            _weightError.value = "Invalid input"
+            return
+        }
+        _weightError.value = null
+        
+        viewModelScope.launch(Dispatchers.IO) {
             repository.updateSet(set)
-            if (set.isCompleted) {
-                startRestTimer(90) // Default rest timer
+            if (set.isCompleted && set.weight > 0 && set.reps > 0) {
+                withContext(Dispatchers.Main) {
+                    startRestTimer(90)
+                }
             }
         }
     }
 
-    fun startRestTimer(seconds: Int) {
+    private fun startRestTimer(seconds: Int) {
         restTimerJob?.cancel()
         restTimerJob = viewModelScope.launch {
             _restTimerSeconds.value = seconds
@@ -218,7 +247,6 @@ class WorkoutViewModel(
                 delay(1000L)
                 _restTimerSeconds.value -= 1
             }
-            // Vibrate/Sound logic could go here
         }
     }
 
@@ -242,7 +270,7 @@ class WorkoutViewModel(
 
     fun saveAsTemplate(name: String) {
         val exercises = uiState.value.exercises
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val templateId = UUID.randomUUID().toString()
             repository.upsertTemplate(WorkoutTemplate(id = templateId, name = name))
             exercises.forEachIndexed { index, ex ->
@@ -257,9 +285,6 @@ class WorkoutViewModel(
                     )
                 )
             }
-            savedStateHandle.remove<String>(KEY_SESSION_ID)
-            _restTimerSeconds.value = 0
-            _summary.value = null
         }
     }
 

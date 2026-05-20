@@ -1,22 +1,28 @@
 package com.al32.fitcheck.ui.features.analytics
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.al32.fitcheck.R
 import com.al32.fitcheck.ui.utils.formatElapsedTime
 import com.al32.fitcheck.ui.viewmodel.AnalyticsUiState
 import com.al32.fitcheck.ui.viewmodel.AnalyticsViewModel
+import com.al32.fitcheck.ui.viewmodel.VolumeRange
 import com.al32.fitcheck.ui.viewmodel.WorkoutSessionWithDetails
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
@@ -69,7 +75,7 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel, onViewHistory: () -> Unit) {
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (selectedTab) {
-                0 -> AnalyticsOverview(uiState)
+                0 -> AnalyticsOverview(uiState, onRangeChange = { viewModel.setRange(it) })
                 1 -> HistoryTab(uiState.sessionHistory)
             }
         }
@@ -77,12 +83,12 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel, onViewHistory: () -> Unit) {
 }
 
 @Composable
-fun AnalyticsOverview(uiState: AnalyticsUiState) {
+fun AnalyticsOverview(uiState: AnalyticsUiState, onRangeChange: (VolumeRange) -> Unit) {
     val modelProducer = remember { CartesianChartModelProducer() }
     val xLabels = remember(uiState.volumeHistory) { uiState.volumeHistory.map { it.first } }
     
     LaunchedEffect(uiState.volumeHistory) {
-        if (uiState.volumeHistory.isNotEmpty()) {
+        if (uiState.hasEnoughDataForChart) {
             modelProducer.runTransaction {
                 lineSeries {
                     series(uiState.volumeHistory.map { it.second })
@@ -103,19 +109,26 @@ fun AnalyticsOverview(uiState: AnalyticsUiState) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("TOTAL VOLUME PER SESSION", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("TOTAL VOLUME PER SESSION", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        RangeToggle(selectedRange = uiState.selectedRange, onRangeChange = onRangeChange)
+                    }
                     Spacer(Modifier.height(20.dp))
                     
-                    if (uiState.volumeHistory.isEmpty()) {
+                    if (!uiState.hasEnoughDataForChart) {
                         Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            Text("Log your first workout to see trends", color = Color.DarkGray, style = MaterialTheme.typography.bodySmall)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Analytics, null, tint = Color.DarkGray, modifier = Modifier.size(48.dp))
+                                Spacer(Modifier.height(12.dp))
+                                Text(stringResource(R.string.chart_empty_state), color = Color.DarkGray, style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
                         }
                     } else {
                         CartesianChartHost(
                             chart = rememberCartesianChart(
                                 rememberLineCartesianLayer(),
                                 startAxis = VerticalAxis.rememberStart(
-                                    valueFormatter = { _, v, _ -> "${v.toInt()} kg" }
+                                    valueFormatter = { _, v, _ -> formatVolume(v) }
                                 ),
                                 bottomAxis = HorizontalAxis.rememberBottom(
                                     valueFormatter = { _, v, _ -> xLabels.getOrNull(v.toInt()) ?: "" }
@@ -133,15 +146,52 @@ fun AnalyticsOverview(uiState: AnalyticsUiState) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("KEY METRICS", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AnalyticsStatCard("ALL-TIME VOLUME", String.format(Locale.getDefault(), "%.0f KG", uiState.totalVolume), Modifier.weight(1f))
+                    AnalyticsStatCard("ALL-TIME VOLUME", formatVolume(uiState.totalVolume), Modifier.weight(1f))
                     AnalyticsStatCard("COMPLETED", uiState.totalWorkouts.toString(), Modifier.weight(1f))
                 }
                 val avgVol = if (uiState.totalWorkouts > 0) uiState.totalVolume / uiState.totalWorkouts else 0.0
-                AnalyticsStatCard("AVG. VOLUME / SESSION", String.format(Locale.getDefault(), "%.0f KG", avgVol))
+                AnalyticsStatCard("AVG. VOLUME / SESSION", formatVolume(avgVol))
             }
         }
         
         item { Spacer(Modifier.height(32.dp)) }
+    }
+}
+
+@Composable
+fun RangeToggle(selectedRange: VolumeRange, onRangeChange: (VolumeRange) -> Unit) {
+    Row(
+        modifier = Modifier
+            .background(Color.DarkGray.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            .padding(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        VolumeRange.entries.forEach { range ->
+            val isSelected = selectedRange == range
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isSelected) Color(0xFFFF851B) else Color.Transparent)
+                    .clickable { onRangeChange(range) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = range.name.take(1),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) Color.White else Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+private fun formatVolume(value: Double): String {
+    return when {
+        value >= 1_000_000 -> String.format(Locale.getDefault(), "%.2fM KG", value / 1_000_000.0)
+        value >= 1_000 -> String.format(Locale.getDefault(), "%.2fK KG", value / 1_000.0)
+        else -> String.format(Locale.getDefault(), "%.0f KG", value)
     }
 }
 

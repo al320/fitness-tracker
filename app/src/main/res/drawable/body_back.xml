@@ -3,23 +3,31 @@
     android:height="520dp"
     android:viewportWidth="200"
     android:viewportHeight="520">
-    <!-- Base Silhouette -->
+    <!-- Detailed Anatomical Silhouette -->
     <path
         android:name="silhouette"
-        android:fillColor="#1C1C1E"
-        android:strokeColor="#33FFFFFF"
-        android:strokeWidth="1"
-        android:pathData="M100,20 C115,20 130,35 130,60 L150,85 C180,105 195,145 185,185 L165,245 L155,325 L165,485 L140,515 L100,510 L60,515 L35,485 L45,325 L35,245 L15,185 C5,145 20,105 50,85 L70,60 C70,35 85,20 100,20 Z" />
+        android:fillColor="#121212"
+        android:strokeColor="#44FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M100,15 C112,15 122,25 122,42 C122,55 118,65 112,70 C125,75 145,85 155,105 C170,120 185,150 190,190 L185,260 C185,280 175,310 165,330 L168,480 C168,500 155,510 140,510 L115,505 L102,490 L100,485 L98,490 L85,505 L60,510 C45,510 32,500 32,480 L35,330 C25,310 15,280 15,260 L10,190 C15,150 30,120 45,105 C55,85 75,75 88,70 C82,65 78,55 78,42 C78,25 88,15 100,15 Z" />
 
-    <!-- Muscles -->
-    <path android:name="trap_upper_l" android:fillColor="#2A2A2A" android:pathData="M100,45 L125,75 L110,95 L100,85 Z" />
-    <path android:name="trap_upper_r" android:fillColor="#2A2A2A" android:pathData="M100,45 L75,75 L90,95 L100,85 Z" />
-    <path android:name="lat_l" android:fillColor="#2A2A2A" android:pathData="M110,140 C140,150 145,240 120,265 L110,250 Z" />
-    <path android:name="lat_r" android:fillColor="#2A2A2A" android:pathData="M90,140 C60,150 55,240 80,265 L90,250 Z" />
-    <path android:name="tricep_l" android:fillColor="#2A2A2A" android:pathData="M145,140 C165,150 160,205 145,215 L135,185 Z" />
-    <path android:name="tricep_r" android:fillColor="#2A2A2A" android:pathData="M55,140 C35,150 40,205 55,215 L65,185 Z" />
-    <path android:name="glute_l" android:fillColor="#2A2A2A" android:pathData="M105,295 C145,305 150,370 105,385 Z" />
-    <path android:name="glute_r" android:fillColor="#2A2A2A" android:pathData="M95,295 C55,305 50,370 95,385 Z" />
-    <path android:name="hamstring_l" android:fillColor="#2A2A2A" android:pathData="M105,395 C135,405 130,460 115,475 L105,475 Z" />
-    <path android:name="hamstring_r" android:fillColor="#2A2A2A" android:pathData="M95,395 C65,405 70,460 85,475 L95,475 Z" />
+    <!-- Traps -->
+    <path android:name="trap_upper_l" android:fillColor="#2A2A2A" android:pathData="M100,75 L125,100 L115,120 L100,110 Z" />
+    <path android:name="trap_upper_r" android:fillColor="#2A2A2A" android:pathData="M100,75 L75,100 L85,120 L100,110 Z" />
+
+    <!-- Lats -->
+    <path android:name="lat_l" android:fillColor="#2A2A2A" android:pathData="M115,140 C145,150 150,240 125,270 L115,255 Z" />
+    <path android:name="lat_r" android:fillColor="#2A2A2A" android:pathData="M85,140 C55,150 50,240 75,270 L85,255 Z" />
+
+    <!-- Triceps -->
+    <path android:name="tricep_l" android:fillColor="#2A2A2A" android:pathData="M155,160 C175,170 170,230 155,240 L145,200 Z" />
+    <path android:name="tricep_r" android:fillColor="#2A2A2A" android:pathData="M45,160 C25,170 30,230 45,240 L55,200 Z" />
+
+    <!-- Glutes -->
+    <path android:name="glute_l" android:fillColor="#2A2A2A" android:pathData="M102,300 C145,310 150,380 105,395 Z" />
+    <path android:name="glute_r" android:fillColor="#2A2A2A" android:pathData="M98,300 C55,310 50,380 95,395 Z" />
+
+    <!-- Hamstrings -->
+    <path android:name="hamstring_l" android:fillColor="#2A2A2A" android:pathData="M105,405 C140,415 135,470 120,485 L105,485 Z" />
+    <path android:name="hamstring_r" android:fillColor="#2A2A2A" android:pathData="M95,405 C60,415 65,470 80,485 L95,485 Z" />
 </vector>

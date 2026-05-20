@@ -32,7 +32,7 @@ interface WorkoutDao {
     @Query("SELECT * FROM exercise_entries WHERE sessionId = :sessionId ORDER BY orderIndex ASC")
     fun getEntriesForSession(sessionId: String): Flow<List<ExerciseEntry>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEntry(entry: ExerciseEntry)
 
     @Delete
@@ -42,5 +42,5 @@ interface WorkoutDao {
     suspend fun updateEntryOrder(entryId: String, newOrder: Int)
 
     @Query("SELECT * FROM exercise_entries WHERE sessionId = :sessionId")
-    fun getEntriesForSessionSync(sessionId: String): Flow<List<ExerciseEntry>>
+    suspend fun getEntriesForSessionSyncNow(sessionId: String): List<ExerciseEntry>
 }

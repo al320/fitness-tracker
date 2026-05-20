@@ -13,17 +13,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -32,7 +31,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.al32.fitcheck.data.preferences.UserPreferencesRepository
 import com.al32.fitcheck.ui.features.analytics.AnalyticsScreen
 import com.al32.fitcheck.ui.features.dashboard.DashboardScreen
 import com.al32.fitcheck.ui.features.exercise_detail.ExerciseDetailScreen
@@ -40,6 +38,9 @@ import com.al32.fitcheck.ui.features.library.CreateCustomExerciseScreen
 import com.al32.fitcheck.ui.features.library.LibraryScreen
 import com.al32.fitcheck.ui.features.library.TemplateEditScreen
 import com.al32.fitcheck.ui.features.profile.ProfileScreen
+import com.al32.fitcheck.ui.features.library.TemplateDetailScreen
+import com.al32.fitcheck.ui.features.library.TemplateListScreen
+import com.al32.fitcheck.ui.features.schedule.ScheduleScreen
 import com.al32.fitcheck.ui.features.settings.SettingsScreen
 import com.al32.fitcheck.ui.features.settings.WeeklyScheduleScreen
 import com.al32.fitcheck.ui.features.workout.SessionSummaryScreen
@@ -65,11 +66,11 @@ fun FitcheckApp() {
     val context = LocalContext.current
     val app = context.applicationContext as FitcheckApplication
     val repository = app.repository
-    val preferencesRepository = UserPreferencesRepository(context)
+    val preferencesRepository = app.preferencesRepository
 
     val strengthScoreViewModel: StrengthScoreViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 @Suppress("UNCHECKED_CAST")
                 return StrengthScoreViewModel(repository, preferencesRepository) as T
             }
@@ -78,25 +79,27 @@ fun FitcheckApp() {
 
     val dashboardViewModel: DashboardViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val savedStateHandle = extras.createSavedStateHandle()
                 @Suppress("UNCHECKED_CAST")
-                return DashboardViewModel(repository, SavedStateHandle()) as T
+                return DashboardViewModel(repository, preferencesRepository, savedStateHandle) as T
             }
         }
     )
 
     val workoutViewModel: WorkoutViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val savedStateHandle = extras.createSavedStateHandle()
                 @Suppress("UNCHECKED_CAST")
-                return WorkoutViewModel(repository, SavedStateHandle()) as T
+                return WorkoutViewModel(repository, savedStateHandle) as T
             }
         }
     )
 
     val analyticsViewModel: AnalyticsViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 @Suppress("UNCHECKED_CAST")
                 return AnalyticsViewModel(repository) as T
             }
@@ -105,7 +108,7 @@ fun FitcheckApp() {
 
     val profileViewModel: ProfileViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 @Suppress("UNCHECKED_CAST")
                 return ProfileViewModel(repository, preferencesRepository, strengthScoreViewModel) as T
             }
@@ -114,18 +117,37 @@ fun FitcheckApp() {
 
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val savedStateHandle = extras.createSavedStateHandle()
                 @Suppress("UNCHECKED_CAST")
-                return LibraryViewModel(repository, SavedStateHandle()) as T
+                return LibraryViewModel(repository, savedStateHandle) as T
             }
         }
     )
 
     val settingsViewModel: SettingsViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 @Suppress("UNCHECKED_CAST")
                 return SettingsViewModel(repository, preferencesRepository) as T
+            }
+        }
+    )
+
+    val scheduleViewModel: ScheduleViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                @Suppress("UNCHECKED_CAST")
+                return ScheduleViewModel(repository) as T
+            }
+        }
+    )
+
+    val templateViewModel: TemplateViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                @Suppress("UNCHECKED_CAST")
+                return TemplateViewModel(repository) as T
             }
         }
     )
@@ -155,7 +177,9 @@ fun FitcheckApp() {
                                         saveState = true
                                     }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    run {
+                                        restoreState = true
+                                    }
                                 }
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -203,7 +227,7 @@ fun FitcheckApp() {
                         navController.navigate("workout")
                     },
                     onStartTemplate = { template ->
-                        workoutViewModel.startWorkout(template.name)
+                        workoutViewModel.startWorkout(template.name, template.id)
                         navController.navigate("workout")
                     },
                     onConfigureSchedule = {
@@ -231,7 +255,7 @@ fun FitcheckApp() {
                 LibraryScreen(
                     viewModel = libraryViewModel,
                     onStartTemplate = { template ->
-                        workoutViewModel.startWorkout(template.name)
+                        workoutViewModel.startWorkout(template.name, template.id)
                         navController.navigate("workout")
                     },
                     onEditTemplate = { template ->
@@ -269,9 +293,10 @@ fun FitcheckApp() {
                 val id = backStackEntry.arguments?.getLong("id") ?: 0L
                 val exerciseDetailViewModel: ExerciseDetailViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
-                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                            val savedStateHandle = extras.createSavedStateHandle()
                             @Suppress("UNCHECKED_CAST")
-                            return ExerciseDetailViewModel(repository, SavedStateHandle(mapOf("id" to id))) as T
+                            return ExerciseDetailViewModel(repository, savedStateHandle) as T
                         }
                     }
                 )
@@ -291,7 +316,37 @@ fun FitcheckApp() {
                         }
                     },
                     onCancel = { navController.popBackStack() },
-                    viewModel = workoutViewModel
+                    viewModel = workoutViewModel,
+                    onSaveTemplate = { name ->
+                        workoutViewModel.saveAsTemplate(name)
+                    }
+                )
+            }
+            composable("schedule") {
+                ScheduleScreen(
+                    viewModel = scheduleViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("template_list") {
+                TemplateListScreen(
+                    viewModel = templateViewModel,
+                    onSelectTemplate = { template: com.al32.fitcheck.data.local.entities.WorkoutTemplate ->
+                        templateViewModel.selectTemplate(template)
+                        navController.navigate("template_detail")
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("template_detail") {
+                TemplateDetailScreen(
+                    viewModel = templateViewModel,
+                    onLoadIntoSession = { template: com.al32.fitcheck.data.local.entities.WorkoutTemplate ->
+                        workoutViewModel.startWorkout(template.name)
+                        // Logic to load exercises into workoutViewModel session would go here
+                        navController.navigate("workout")
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(
@@ -301,9 +356,10 @@ fun FitcheckApp() {
                 val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
                 val sessionSummaryViewModel: SessionSummaryViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
-                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                            val savedStateHandle = extras.createSavedStateHandle()
                             @Suppress("UNCHECKED_CAST")
-                            return SessionSummaryViewModel(repository, SavedStateHandle(mapOf("sessionId" to sessionId))) as T
+                            return SessionSummaryViewModel(repository, savedStateHandle) as T
                         }
                     }
                 )

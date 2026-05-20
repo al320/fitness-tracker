@@ -1,9 +1,10 @@
 package com.al32.fitcheck.domain.recovery
 
 import com.al32.fitcheck.data.local.dao.SetWithPhysiology
+import com.al32.fitcheck.domain.physiology.MovementPattern
 import com.al32.fitcheck.domain.physiology.MuscleGroup
+import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.pow
 
 data class Readiness(
     val group: MuscleGroup,
@@ -14,32 +15,63 @@ data class Readiness(
 )
 
 object RecoveryEngine {
+    private const val MAX_FATIGUE_THRESHOLD = 20.0f
+    private const val RECOVERY_THRESHOLD = 0.85f
 
     fun computeReadinessFromJoined(sets: List<SetWithPhysiology>): Map<MuscleGroup, Readiness> {
         val now = System.currentTimeMillis()
-        val fatigueEvents = sets.flatMap { set ->
-            val stimulus = ln(1.0 + (set.weight * set.reps) / 100.0).toFloat()
-            val primary = set.primaryMuscles.map { FatigueEvent(it, stimulus * 1.0f, set.completedAt) }
-            val secondary = set.secondaryMuscles.map { FatigueEvent(it, stimulus * 0.35f, set.completedAt) }
-            primary + secondary
+        val currentFatigueMap = mutableMapOf<MuscleGroup, Float>()
+
+        sets.forEach { set ->
+            val hoursSince = (now - set.completedAt).toDouble() / 3_600_000.0
+            val intensityFactor = (set.weight / 100f).coerceIn(0.5f, 3.0f)
+            
+            val primary = if (set.primaryMuscles.isNotEmpty()) set.primaryMuscles else inferMuscles(set.movementPattern, true)
+            val secondary = if (set.secondaryMuscles.isNotEmpty()) set.secondaryMuscles else inferMuscles(set.movementPattern, false)
+            
+            primary.forEach { muscle ->
+                val lambda = ln(2.0) / getHalfLife(muscle)
+                val contribution = intensityFactor * exp(-lambda * hoursSince).toFloat()
+                currentFatigueMap[muscle] = (currentFatigueMap[muscle] ?: 0f) + contribution
+            }
+            secondary.forEach { muscle ->
+                val lambda = ln(2.0) / getHalfLife(muscle)
+                val contribution = (intensityFactor * 0.35f) * exp(-lambda * hoursSince).toFloat()
+                currentFatigueMap[muscle] = (currentFatigueMap[muscle] ?: 0f) + contribution
+            }
         }
 
         return MuscleGroup.entries.associateWith { group ->
-            val groupEvents = fatigueEvents.filter { it.muscle == group }
-            val currentFatigue = groupEvents.sumOf { event ->
-                val hoursPassed = (now - event.timestamp).toDouble() / 3_600_000.0
-                val halfLife = if (group == MuscleGroup.LOWER_BACK) 72.0 else 48.0
-                event.stimulus * (0.5).pow(hoursPassed / halfLife)
-            }.toFloat()
-
-            val readiness = (1.0f - (currentFatigue / 2.0f)).coerceIn(0f, 1f)
-            val hours = if (currentFatigue > 0.1f) {
-                (48 * (ln(currentFatigue / 0.1) / ln(2.0))).toInt().coerceAtLeast(0)
+            val fatigue = currentFatigueMap[group] ?: 0f
+            val score = (1.0f - (fatigue / MAX_FATIGUE_THRESHOLD)).coerceIn(0f, 1f)
+            
+            val halfLife = getHalfLife(group)
+            val lambda = ln(2.0) / halfLife
+            val targetFatigue = (1.0f - RECOVERY_THRESHOLD) * MAX_FATIGUE_THRESHOLD
+            
+            val hours = if (fatigue > targetFatigue) {
+                (ln(fatigue.toDouble() / targetFatigue) / lambda).toInt().coerceIn(0, 96)
             } else 0
 
-            Readiness(group, readiness, currentFatigue, (readiness * 100).toInt(), hours)
+            Readiness(group, score, fatigue, (score * 100).toInt(), hours)
         }
     }
 
-    private data class FatigueEvent(val muscle: MuscleGroup, val stimulus: Float, val timestamp: Long)
+    private fun inferMuscles(pattern: MovementPattern, isPrimary: Boolean): List<MuscleGroup> {
+        return when (pattern) {
+            MovementPattern.SQUAT -> if (isPrimary) listOf(MuscleGroup.QUADS, MuscleGroup.GLUTES) else emptyList()
+            MovementPattern.HINGE -> if (isPrimary) listOf(MuscleGroup.HAMSTRINGS, MuscleGroup.LOWER_BACK) else listOf(MuscleGroup.GLUTES)
+            MovementPattern.PUSH -> if (isPrimary) listOf(MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER) else listOf(MuscleGroup.FRONT_DELT, MuscleGroup.TRICEPS)
+            MovementPattern.PULL -> if (isPrimary) listOf(MuscleGroup.LATS, MuscleGroup.UPPER_BACK) else listOf(MuscleGroup.BICEPS, MuscleGroup.REAR_DELT)
+            MovementPattern.ISOLATION -> emptyList()
+            MovementPattern.CARRY -> if (isPrimary) listOf(MuscleGroup.FOREARMS, MuscleGroup.UPPER_BACK) else emptyList()
+        }
+    }
+
+    private fun getHalfLife(group: MuscleGroup): Double = when (group) {
+        MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES -> 60.0
+        MuscleGroup.LOWER_BACK -> 72.0
+        MuscleGroup.UPPER_BACK, MuscleGroup.LATS, MuscleGroup.CHEST_UPPER, MuscleGroup.CHEST_LOWER -> 48.0
+        else -> 36.0
+    }
 }

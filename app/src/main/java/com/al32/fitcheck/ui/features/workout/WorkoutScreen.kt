@@ -1,10 +1,7 @@
 package com.al32.fitcheck.ui.features.workout
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +22,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -32,34 +30,41 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.al32.fitcheck.R
 import com.al32.fitcheck.data.local.entities.Exercise
 import com.al32.fitcheck.data.local.entities.ExerciseEntry
 import com.al32.fitcheck.data.local.entities.SetEntry
-import com.al32.fitcheck.ui.theme.EliteWhite
+import com.al32.fitcheck.ui.theme.*
 import com.al32.fitcheck.ui.utils.formatElapsedTime
 import com.al32.fitcheck.ui.viewmodel.ExerciseWithSets
 import com.al32.fitcheck.ui.viewmodel.WorkoutUiState
 import com.al32.fitcheck.ui.viewmodel.WorkoutViewModel
 import java.util.Locale
-import androidx.navigation.NavController
 
 @Composable
 fun WorkoutScreen(
     onFinish: (String) -> Unit,
     onCancel: () -> Unit,
-    viewModel: WorkoutViewModel
+    viewModel: WorkoutViewModel,
+    onSaveTemplate: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val haptic = LocalHapticFeedback.current
 
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
     WorkoutContent(
         uiState = uiState,
         onFinish = {
-            viewModel.finishWorkout()
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            // Wait for session id to be available in state after finish? 
-            // Or just navigate to summary with the current id.
-            uiState.session?.id?.let { onFinish(it) }
+            if (uiState.completedSetsCount == 0) {
+                showDiscardDialog = true
+            } else {
+                viewModel.finishWorkout { id -> 
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onFinish(id)
+                }
+            }
         },
         onCancel = onCancel,
         onAddSet = viewModel::addSet,
@@ -70,7 +75,70 @@ fun WorkoutScreen(
         onSelect = viewModel::addExercise,
         onRemoveExercise = viewModel::removeExercise,
         onAddRest = { viewModel.addRestTime(30) },
-        onSkipRest = { viewModel.skipRest() }
+        onSkipRest = { viewModel.skipRest() },
+        onShowSaveTemplate = { showSaveTemplateDialog = true },
+        onToggleTimer = { viewModel.toggleTimer() }
+    )
+
+    if (showSaveTemplateDialog) {
+        SaveTemplateDialog(
+            onDismiss = { showSaveTemplateDialog = false },
+            onSave = { name ->
+                viewModel.saveAsTemplate(name)
+                showSaveTemplateDialog = false
+                onSaveTemplate(name)
+            }
+        )
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text(stringResource(R.string.dialog_discard_title)) },
+            text = { Text(stringResource(R.string.dialog_discard_msg)) },
+            confirmButton = {
+                TextButton(onClick = { onCancel(); showDiscardDialog = false }) {
+                    Text("DISCARD", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("CANCEL", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF111111)
+        )
+    }
+}
+
+@Composable
+fun SaveTemplateDialog(
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("SAVE AS ROUTINE", fontWeight = FontWeight.Black) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Routine Name") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (name.isNotBlank()) onSave(name) }) {
+                Text("SAVE", color = Color(0xFFFF851B))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCEL", color = Color.Gray) }
+        },
+        containerColor = Color(0xFF111111),
+        titleContentColor = Color.White,
+        textContentColor = Color.White
     )
 }
 
@@ -88,7 +156,9 @@ fun WorkoutContent(
     onSelect: (Exercise) -> Unit,
     onRemoveExercise: (ExerciseEntry) -> Unit,
     onAddRest: () -> Unit,
-    onSkipRest: () -> Unit
+    onSkipRest: () -> Unit,
+    onShowSaveTemplate: () -> Unit,
+    onToggleTimer: () -> Unit
 ) {
     val lazyListState = rememberLazyListState()
 
@@ -97,7 +167,10 @@ fun WorkoutContent(
             WorkoutTopBar(
                 timer = formatElapsedTime(uiState.elapsedTime),
                 onCancel = onCancel,
-                onFinish = onFinish
+                onFinish = onFinish,
+                onShowSaveTemplate = onShowSaveTemplate,
+                isRunning = uiState.isTimerRunning,
+                onToggleTimer = onToggleTimer
             )
         },
         bottomBar = {
@@ -138,7 +211,8 @@ fun WorkoutContent(
                         section = section,
                         onAddSet = { onAddSet(section.entry.id) },
                         onUpdateSet = onUpdateSet,
-                        onRemove = { onRemoveExercise(section.entry) }
+                        onRemove = { onRemoveExercise(section.entry) },
+                        weightError = uiState.weightError
                     )
                 }
 
@@ -158,26 +232,43 @@ fun WorkoutContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutTopBar(timer: String, onCancel: () -> Unit, onFinish: () -> Unit) {
+fun WorkoutTopBar(timer: String, onCancel: () -> Unit, onFinish: () -> Unit, onShowSaveTemplate: () -> Unit, isRunning: Boolean, onToggleTimer: () -> Unit, isFinishing: Boolean = false) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("SESSION", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
                 Spacer(Modifier.width(12.dp))
-                Text(timer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { if (!isFinishing) onToggleTimer() }) {
+                    Text(timer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        null,
+                        tint = if (isRunning) Color.Gray else Color(0xFFFF851B),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         },
         navigationIcon = {
-            IconButton(onClick = onCancel) { Icon(Icons.Default.Close, null, tint = Color.Gray) }
+            IconButton(onClick = onCancel, enabled = !isFinishing) { Icon(Icons.Default.Close, null, tint = Color.Gray) }
         },
         actions = {
+            IconButton(onClick = onShowSaveTemplate, enabled = !isFinishing) {
+                Icon(Icons.Default.Save, null, tint = Color.Gray)
+            }
             Button(
                 onClick = onFinish,
+                enabled = !isFinishing,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF851B)),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp).padding(end = 8.dp)
             ) {
-                Text("FINISH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                if (isFinishing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.btn_finish), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -209,7 +300,8 @@ fun WorkoutExerciseSection(
     section: ExerciseWithSets,
     onAddSet: () -> Unit,
     onUpdateSet: (SetEntry) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    weightError: String?
 ) {
     val lastSet = section.previousPerformance.firstOrNull()
     val maxPrevWeight = section.previousPerformance.maxOfOrNull { it.weight } ?: 0f
@@ -241,7 +333,7 @@ fun WorkoutExerciseSection(
         }
 
         section.sets.forEachIndexed { index, set ->
-            WorkoutSetRow(index = index + 1, set = set, onUpdate = onUpdateSet, isPRAttempt = set.weight > maxPrevWeight)
+            WorkoutSetRow(index = index + 1, set = set, onUpdate = onUpdateSet, isPRAttempt = set.weight > maxPrevWeight, hasError = weightError != null && !set.isCompleted)
         }
 
         TextButton(onClick = onAddSet, modifier = Modifier.padding(horizontal = 12.dp)) {
@@ -255,7 +347,7 @@ fun WorkoutExerciseSection(
 }
 
 @Composable
-fun WorkoutSetRow(index: Int, set: SetEntry, onUpdate: (SetEntry) -> Unit, isPRAttempt: Boolean) {
+fun WorkoutSetRow(index: Int, set: SetEntry, onUpdate: (SetEntry) -> Unit, isPRAttempt: Boolean, hasError: Boolean) {
     val haptic = LocalHapticFeedback.current
     val rowColor by animateColorAsState(
         targetValue = if (set.isCompleted) Color(0xFF1A3A1A) else Color.Transparent,
@@ -277,8 +369,8 @@ fun WorkoutSetRow(index: Int, set: SetEntry, onUpdate: (SetEntry) -> Unit, isPRA
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Text("-", style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
             }
-            SetInputBox(value = if (set.weight == 0f) "" else set.weight.toString(), onValueChange = { val w = it.toFloatOrNull() ?: 0f; onUpdate(set.copy(weight = w)) }, modifier = Modifier.weight(1f))
-            SetInputBox(value = if (set.reps == 0) "" else set.reps.toString(), onValueChange = { val r = it.toIntOrNull() ?: 0; onUpdate(set.copy(reps = r)) }, modifier = Modifier.weight(1f))
+            SetInputBox(value = if (set.weight == 0f) "" else set.weight.toString(), onValueChange = { val w = it.toFloatOrNull() ?: 0f; onUpdate(set.copy(weight = w)) }, modifier = Modifier.weight(1f), isError = hasError)
+            SetInputBox(value = if (set.reps == 0) "" else set.reps.toString(), onValueChange = { val r = it.toIntOrNull() ?: 0; onUpdate(set.copy(reps = r)) }, modifier = Modifier.weight(1f), isError = hasError)
 
             IconButton(
                 onClick = {
@@ -301,12 +393,12 @@ fun WorkoutSetRow(index: Int, set: SetEntry, onUpdate: (SetEntry) -> Unit, isPRA
 }
 
 @Composable
-fun SetInputBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SetInputBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, isError: Boolean = false) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.height(34.dp).background(Color.DarkGray.copy(alpha = 0.15f), RoundedCornerShape(4.dp)).padding(4.dp),
-        textStyle = TextStyle(color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp, textAlign = TextAlign.Center),
+        modifier = modifier.height(34.dp).background(if (isError) Color.Red.copy(alpha = 0.1f) else Color.DarkGray.copy(alpha = 0.15f), RoundedCornerShape(4.dp)).padding(4.dp),
+        textStyle = TextStyle(color = if (isError) Color.Red else Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp, textAlign = TextAlign.Center),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
         singleLine = true,
         cursorBrush = SolidColor(Color.White)

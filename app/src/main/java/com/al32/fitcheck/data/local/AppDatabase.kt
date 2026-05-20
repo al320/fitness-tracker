@@ -37,6 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun templateDao(): TemplateDao
     abstract fun prDao(): PRDao
     abstract fun weeklyScheduleDao(): WeeklyScheduleDao
+    abstract fun analyticsDao(): AnalyticsDao
 
     companion object {
         @Volatile

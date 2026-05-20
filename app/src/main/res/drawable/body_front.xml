@@ -3,28 +3,33 @@
     android:height="520dp"
     android:viewportWidth="200"
     android:viewportHeight="520">
-    <!-- Base Silhouette -->
+    <!-- Detailed Anatomical Silhouette -->
     <path
         android:name="silhouette"
-        android:fillColor="#1C1C1E"
-        android:strokeColor="#33FFFFFF"
-        android:strokeWidth="1"
-        android:pathData="M100,20 C115,20 130,35 130,60 L145,85 C175,100 195,140 185,180 L165,240 L155,320 L165,480 L135,510 L105,510 L100,500 L95,510 L65,510 L35,480 L45,320 L35,240 L15,180 C5,140 25,100 55,85 L70,60 C70,35 85,20 100,20 Z" />
+        android:fillColor="#121212"
+        android:strokeColor="#44FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M100,15 C112,15 122,25 122,42 C122,55 118,65 112,70 C125,75 145,85 155,105 C170,120 185,150 190,190 L185,260 C185,280 175,310 165,330 L168,480 C168,500 155,510 140,510 L115,505 L102,490 L100,485 L98,490 L85,505 L60,510 C45,510 32,500 32,480 L35,330 C25,310 15,280 15,260 L10,190 C15,150 30,120 45,105 C55,85 75,75 88,70 C82,65 78,55 78,42 C78,25 88,15 100,15 Z" />
 
-    <!-- Muscles -->
-    <path android:name="pec_upper_l" android:fillColor="#2A2A2A" android:pathData="M105,95 C120,90 135,95 145,105 L105,115 Z" />
-    <path android:name="pec_upper_r" android:fillColor="#2A2A2A" android:pathData="M95,95 C80,90 65,95 55,105 L95,115 Z" />
-    <path android:name="pec_lower_l" android:fillColor="#2A2A2A" android:pathData="M105,115 L145,105 C150,130 145,160 105,165 Z" />
-    <path android:name="pec_lower_r" android:fillColor="#2A2A2A" android:pathData="M95,115 L55,105 C50,130 55,160 95,165 Z" />
-    <path android:name="ant_delt_l" android:fillColor="#2A2A2A" android:pathData="M145,90 C160,95 165,115 150,130 L140,110 Z" />
-    <path android:name="ant_delt_r" android:fillColor="#2A2A2A" android:pathData="M55,90 C40,95 35,115 50,130 L60,110 Z" />
-    <path android:name="lat_delt_l" android:fillColor="#2A2A2A" android:pathData="M155,105 C175,115 170,145 155,160 L145,130 Z" />
-    <path android:name="lat_delt_r" android:fillColor="#2A2A2A" android:pathData="M45,105 C25,115 30,145 45,160 L55,130 Z" />
-    <path android:name="bicep_l" android:fillColor="#2A2A2A" android:pathData="M145,145 C165,155 160,200 145,210 L135,180 Z" />
-    <path android:name="bicep_r" android:fillColor="#2A2A2A" android:pathData="M55,145 C35,155 40,200 55,210 L65,180 Z" />
-    <path android:name="abs_upper" android:fillColor="#2A2A2A" android:pathData="M85,175 L115,175 L115,200 L85,200 Z" />
-    <path android:name="abs_mid" android:fillColor="#2A2A2A" android:pathData="M85,205 L115,205 L115,230 L85,230 Z" />
-    <path android:name="abs_lower" android:fillColor="#2A2A2A" android:pathData="M85,235 L115,235 L110,270 L90,270 Z" />
-    <path android:name="quad_l" android:fillColor="#2A2A2A" android:pathData="M105,305 C135,315 145,400 125,445 L105,445 Z" />
-    <path android:name="quad_r" android:fillColor="#2A2A2A" android:pathData="M95,305 C65,315 55,400 75,445 L95,445 Z" />
+    <!-- Head & Neck Detail -->
+    <path android:fillColor="#1A1A1A" android:pathData="M90,70 L110,70 L108,85 L92,85 Z" />
+
+    <!-- Muscles Placeholder (will be colored by code) -->
+    <path android:name="pec_upper_l" android:fillColor="#2A2A2A" android:pathData="M105,100 C125,95 140,105 148,120 L105,130 Z" />
+    <path android:name="pec_upper_r" android:fillColor="#2A2A2A" android:pathData="M95,100 C75,95 60,105 52,120 L95,130 Z" />
+    <path android:name="pec_lower_l" android:fillColor="#2A2A2A" android:pathData="M105,130 L148,120 C155,150 145,180 105,185 Z" />
+    <path android:name="pec_lower_r" android:fillColor="#2A2A2A" android:pathData="M95,130 L52,120 C45,150 55,180 95,185 Z" />
+
+    <path android:name="ant_delt_l" android:fillColor="#2A2A2A" android:pathData="M150,105 C165,110 172,135 160,155 L145,135 Z" />
+    <path android:name="ant_delt_r" android:fillColor="#2A2A2A" android:pathData="M50,105 C35,110 28,135 40,155 L55,135 Z" />
+
+    <path android:name="bicep_l" android:fillColor="#2A2A2A" android:pathData="M155,165 C175,175 170,230 155,245 L145,210 Z" />
+    <path android:name="bicep_r" android:fillColor="#2A2A2A" android:pathData="M45,165 C25,175 30,230 45,245 L55,210 Z" />
+
+    <path android:name="abs_upper" android:fillColor="#2A2A2A" android:pathData="M88,190 L112,190 L112,215 L88,215 Z" />
+    <path android:name="abs_mid" android:fillColor="#2A2A2A" android:pathData="M88,220 L112,220 L112,245 L88,245 Z" />
+    <path android:name="abs_lower" android:fillColor="#2A2A2A" android:pathData="M88,250 L112,250 L108,285 L92,285 Z" />
+
+    <path android:name="quad_l" android:fillColor="#2A2A2A" android:pathData="M105,320 C140,330 155,420 135,465 L108,465 Z" />
+    <path android:name="quad_r" android:fillColor="#2A2A2A" android:pathData="M95,320 C60,330 45,420 65,465 L92,465 Z" />
 </vector>
